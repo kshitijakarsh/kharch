@@ -1,6 +1,6 @@
 import { Bot } from "grammy";
 
-let bot : any;
+let bot : Bot | null = null;
 
 export default function getBot() {
   if (!bot) {

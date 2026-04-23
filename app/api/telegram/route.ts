@@ -5,14 +5,15 @@ let isInitialized = false;
 
 export async function POST(request: NextRequest) {
   const update = await request.json();
+  const bot = getBot();
 
   try {
     if (!isInitialized) {
-      await getBot().init();
+      await bot.init();
       isInitialized = true;
     }
 
-    await getBot().handleUpdate(update);
+    await bot.handleUpdate(update);
   } catch (error) {
     console.error("Error handling update:", error);
   }
