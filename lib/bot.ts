@@ -4,7 +4,7 @@ let bot : any;
 
 export default function getBot() {
   if (!bot) {
-    const token = process.env.TELEGRAM_TOKEN;
+    const token = process.env.TELEGRAM_BOT_TOKEN;
 
     if (!token) {
       throw new Error("TELEGRAM_TOKEN is missing");
