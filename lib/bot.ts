@@ -1,13 +1,25 @@
 import { Bot } from "grammy";
 
-export const bot = new Bot(process.env.BOT_TOKEN!);
+let bot : any;
 
-// basic handlers at the beginning
+export default function getBot() {
+  if (!bot) {
+    const token = process.env.TELEGRAM_TOKEN;
 
-bot.command("start", (ctx) => {
-  ctx.reply("Welcome to Kharch Bot! ");
-});
+    if (!token) {
+      throw new Error("TELEGRAM_TOKEN is missing");
+    }
 
-bot.on("message:text", (ctx) => {
-  ctx.reply("You said: " + ctx.message.text);
-});
+    bot = new Bot(token);
+
+    bot.command("start", (ctx : any) => {
+      ctx.reply("Welcome to Kharch Bot!");
+    });
+
+    bot.on("message:text", (ctx : any) => {
+      ctx.reply("You said: " + ctx.message.text);
+    });
+  }
+
+  return bot;
+}
