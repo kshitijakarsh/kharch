@@ -16,10 +16,6 @@ export default function getBot() {
       ctx.reply("Welcome to Kharch Bot!");
     });
 
-    bot.on("message:text", (ctx : any) => {
-      ctx.reply("You said: " + ctx.message.text);
-    });
-
     bot.command("help", (ctx : any) => {
       ctx.reply("Available commands:\n/start - Start the bot\n/help - Show this help message\n/describe - Describe the bot");
     });
@@ -27,6 +23,11 @@ export default function getBot() {
     bot.command("describe", (ctx : any) => {
       ctx.reply("Kharch Bot is a simple bot to help you manage your expenses.");
     });
+
+    bot.on("message:text", (ctx : any) => {
+      ctx.reply("You said: " + ctx.message.text);
+    });
+
   }
 
   return bot;
