@@ -158,8 +158,11 @@ export default function getBot() {
 
     bot.command("salary", async (ctx: any) => {
       const text = ctx.message?.text?.replace("/salary", "").trim();
+      const userId = ctx.from?.id;
+      if (!userId) return;
+
       if (!text) {
-        const salary = await getUserSalary(ctx.from?.id);
+        const salary = await getUserSalary(userId);
         return ctx.reply(
           `💰 *Monthly Salary*\n\n` +
           `Current: *₹${salary.toLocaleString()}*\n\n` +
@@ -167,6 +170,19 @@ export default function getBot() {
           { parse_mode: "Markdown" }
         );
       }
+
+      // If it's a direct number, update directly
+      const amount = parseFloat(text.replace(/,/g, ''));
+      if (!isNaN(amount) && amount > 0) {
+        await updateUserSalary(userId, amount);
+        return ctx.reply(
+          `✅ *Salary Updated!*\n\n` +
+          `Your monthly income is now set to *₹${amount.toLocaleString()}*.`,
+          { parse_mode: "Markdown" }
+        );
+      }
+
+      // Otherwise, let the LLM handle it (e.g. "/salary 80k")
       handleIncomingMessage(ctx, text);
     });
 

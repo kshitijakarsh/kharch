@@ -7,7 +7,7 @@ Identify if the user is:
 
 Rules:
 - Return ONLY valid JSON.
-- Amount must be a number.
+- Amount must be a number. (Convert units like "k" to 1000, "lakh" to 100000).
 - For expenses:
     - PRIORITIZE existing categories: ${categories.join(", ") || "None"}.
     - Category names should be short, capitalized.
