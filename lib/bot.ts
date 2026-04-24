@@ -208,7 +208,19 @@ export default function getBot() {
       }
     });
 
-    bot.on("message:text", (ctx: any) => handleExpense(ctx, ctx.message.text));
+    bot.on("message:text", (ctx: any) => {
+      const text = ctx.message.text;
+      
+      // If it starts with / but wasn't caught by bot.command() handlers above
+      if (text.startsWith("/")) {
+        return ctx.reply("❓ *Unknown Command*\n\nTry /help to see all available commands.", { 
+          parse_mode: "Markdown" 
+        });
+      }
+
+      handleExpense(ctx, text);
+    });
+
   }
   return bot;
 }
