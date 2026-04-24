@@ -1,6 +1,5 @@
 import React from 'react';
 import { LucideIcon } from 'lucide-react';
-import { Card, CardContent } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
 
 interface SummaryCardProps {
@@ -8,34 +7,42 @@ interface SummaryCardProps {
   value: string;
   icon: LucideIcon;
   trend?: string;
-  trendType?: 'up' | 'down' | 'neutral';
   color?: string;
 }
 
-export function SummaryCard({ title, value, icon: Icon, trend, trendType, color }: SummaryCardProps) {
+export function SummaryCard({ title, value, icon: Icon, color, trend }: SummaryCardProps) {
   return (
-    <Card className="overflow-hidden border-none bg-white shadow-sm dark:bg-zinc-900 transition-all hover:shadow-md">
-      <CardContent className="p-6">
-        <div className="flex items-center justify-between">
-          <div className={cn("rounded-xl p-2.5", color || "bg-zinc-100 text-zinc-900 dark:bg-zinc-800 dark:text-zinc-50")}>
-            <Icon size={20} />
-          </div>
-          {trend && (
-            <span className={cn(
-              "text-xs font-medium px-2 py-1 rounded-full",
-              trendType === 'up' ? "bg-red-50 text-red-600 dark:bg-red-900/20 dark:text-red-400" :
-              trendType === 'down' ? "bg-green-50 text-green-600 dark:bg-green-900/20 dark:text-green-400" :
-              "bg-zinc-50 text-zinc-600 dark:bg-zinc-800 dark:text-zinc-400"
-            )}>
-              {trend}
-            </span>
-          )}
+    <div className="rounded-2xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900/50 p-6">
+      <div className="flex items-center justify-between mb-6">
+        {/*
+          Light: white bg, icon coloured by the `color` prop (text-zinc-* classes).
+          Dark:  subtle zinc-800 fill so the icon has contrast on the dark surface.
+        */}
+        <div className={cn(
+          "flex h-10 w-10 items-center justify-center rounded-xl",
+          "bg-white dark:bg-zinc-800",
+          "border border-zinc-200 dark:border-zinc-700",
+          color ?? "text-zinc-500 dark:text-zinc-400"
+        )}>
+          <Icon size={20} />
         </div>
-        <div className="mt-4">
-          <p className="text-sm font-medium text-zinc-500 dark:text-zinc-400">{title}</p>
-          <h3 className="mt-1 text-2xl font-bold tracking-tight text-zinc-900 dark:text-zinc-50">{value}</h3>
-        </div>
-      </CardContent>
-    </Card>
+
+        {trend && (
+          <span className={cn(
+            "text-[10px] font-bold px-2 py-1 rounded-md uppercase tracking-widest",
+            trend.startsWith('+')
+              ? "bg-emerald-50 dark:bg-emerald-500/10 text-emerald-600 dark:text-emerald-400"
+              : "bg-red-50 dark:bg-red-500/10 text-red-600 dark:text-red-400"
+          )}>
+            {trend}
+          </span>
+        )}
+      </div>
+
+      <div className="space-y-1">
+        <p className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest">{title}</p>
+        <h3 className="text-3xl font-serif text-zinc-900 dark:text-zinc-50">{value}</h3>
+      </div>
+    </div>
   );
 }

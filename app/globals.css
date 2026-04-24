@@ -1,80 +1,75 @@
+@import url('https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,200..800&family=Instrument+Serif:ital,wght@0,400;1,400&display=swap');
 @import "tailwindcss";
 
+/* ── Design tokens (Tailwind v4 @theme) ───────────────────────────────────── */
 @theme {
-  --color-background: hsl(var(--background));
-  --color-foreground: hsl(var(--foreground));
-  --color-card: hsl(var(--card));
-  --color-card-foreground: hsl(var(--card-foreground));
-  --color-popover: hsl(var(--popover));
-  --color-popover-foreground: hsl(var(--popover-foreground));
-  --color-primary: hsl(var(--primary));
-  --color-primary-foreground: hsl(var(--primary-foreground));
-  --color-secondary: hsl(var(--secondary));
-  --color-secondary-foreground: hsl(var(--secondary-foreground));
-  --color-muted: hsl(var(--muted));
-  --color-muted-foreground: hsl(var(--muted-foreground));
-  --color-accent: hsl(var(--accent));
-  --color-accent-foreground: hsl(var(--accent-foreground));
-  --color-destructive: hsl(var(--destructive));
-  --color-destructive-foreground: hsl(var(--destructive-foreground));
-  --color-border: hsl(var(--border));
-  --color-input: hsl(var(--input));
-  --color-ring: hsl(var(--ring));
-  --radius-xl: calc(var(--radius) + 4px);
-  --radius-2xl: calc(var(--radius) + 8px);
+  /* Colours – consumed by bg-*, text-*, border-* utilities */
+  --color-background:       #ffffff;
+  --color-foreground:       #18181b;
+  --color-card:             #ffffff;        /* used by ShadCN bg-card          */
+  --color-card-foreground:  #18181b;        /* used by ShadCN text-card-foreground */
+  --color-border:           #e4e4e7;
+  --color-muted:            #f4f4f5;
+  --color-muted-foreground: #71717a;
+
+  /* Typography */
+  --font-sans:  'Bricolage Grotesque', sans-serif;
+  --font-serif: 'Instrument Serif', serif;
+
+  /* Radii */
+  --radius-xl:  0.75rem;
+  --radius-2xl: 1rem;
 }
 
+/* ── CSS custom properties (used by globals + ShadCN) ─────────────────────── */
 :root {
-  --background: 0 0% 100%;
-  --foreground: 240 10% 3.9%;
-  --card: 0 0% 100%;
-  --card-foreground: 240 10% 3.9%;
-  --popover: 0 0% 100%;
-  --popover-foreground: 240 10% 3.9%;
-  --primary: 240 5.9% 10%;
-  --primary-foreground: 0 0% 98%;
-  --secondary: 240 4.8% 95.9%;
-  --secondary-foreground: 240 5.9% 10%;
-  --muted: 240 3.8% 46.1%;
-  --muted-foreground: 240 3.8% 46.1%;
-  --accent: 240 4.8% 95.9%;
-  --accent-foreground: 240 5.9% 10%;
-  --destructive: 0 84.2% 60.2%;
-  --destructive-foreground: 0 0% 98%;
-  --border: 240 5.9% 90%;
-  --input: 240 5.9% 90%;
-  --ring: 240 5.9% 10%;
-  --radius: 0.5rem;
+  --background:       #ffffff;
+  --foreground:       #18181b;
+  --card:             #ffffff;
+  --card-foreground:  #18181b;
+  --border:           #e4e4e7;
+  --radius:           0.75rem;
 }
 
 .dark {
-  --background: 240 10% 3.9%;
-  --foreground: 0 0% 98%;
-  --card: 240 10% 3.9%;
-  --card-foreground: 0 0% 98%;
-  --popover: 240 10% 3.9%;
-  --popover-foreground: 0 0% 98%;
-  --primary: 0 0% 98%;
-  --primary-foreground: 240 5.9% 10%;
-  --secondary: 240 3.7% 15.9%;
-  --secondary-foreground: 0 0% 98%;
-  --muted: 240 3.7% 15.9%;
-  --muted-foreground: 240 5% 64.9%;
-  --accent: 240 3.7% 15.9%;
-  --accent-foreground: 0 0% 98%;
-  --destructive: 0 62.8% 30.6%;
-  --destructive-foreground: 0 0% 98%;
-  --border: 240 3.7% 15.9%;
-  --input: 240 3.7% 15.9%;
-  --ring: 240 4.9% 83.9%;
+  --background:       #09090b;
+  --foreground:       #fafafa;
+  --card:             #09090b;
+  --card-foreground:  #fafafa;
+  --border:           #27272a;
+
+  /* Override @theme tokens in dark mode */
+  --color-background:       #09090b;
+  --color-foreground:       #fafafa;
+  --color-card:             #09090b;
+  --color-card-foreground:  #fafafa;
+  --color-border:           #27272a;
 }
 
+/* ── Base styles ──────────────────────────────────────────────────────────── */
 @layer base {
   * {
-    @apply border-border;
+    border-color: var(--border);
+    box-shadow:   none !important;
   }
+
   body {
-    @apply bg-background text-foreground;
-    font-feature-settings: "rlig" 1, "calt" 1;
+    background-color: var(--background);
+    color:            var(--foreground);
+    @apply font-sans scroll-smooth antialiased;
+  }
+}
+
+/* ── Reusable component utilities ─────────────────────────────────────────── */
+@layer components {
+  .section-divider {
+    @apply border-t border-zinc-200 dark:border-zinc-800 w-full;
+  }
+
+  /* white card in light; very dark card in dark */
+  .clean-card {
+    @apply bg-white dark:bg-zinc-900
+           border border-zinc-200 dark:border-zinc-800
+           rounded-xl p-6 transition-colors;
   }
 }

@@ -1,58 +1,63 @@
+"use client";
+
 import React from 'react';
-import { LayoutDashboard, ReceiptText, BarChart3, Bot, Settings, LogOut } from 'lucide-react';
+import { LayoutDashboard, MessageSquare, LogOut, Bot } from 'lucide-react';
 import { cn } from "@/lib/utils";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 
-const navItems = [
-  { icon: LayoutDashboard, label: 'Dashboard', active: true },
-  { icon: ReceiptText, label: 'Expenses' },
-  { icon: BarChart3, label: 'Analytics' },
-  { icon: Bot, label: 'AI Assistant' },
-  { icon: Settings, label: 'Settings' },
-];
+interface SidebarProps {
+  activeView: string;
+  onViewChange: (view: string) => void;
+  onLogout: () => void;
+}
 
-export function Sidebar() {
+export function Sidebar({ activeView, onViewChange, onLogout }: SidebarProps) {
+  const menuItems = [
+    { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
+    { id: 'ai', label: 'AI Assistant', icon: MessageSquare },
+  ];
+
   return (
-    <div className="flex h-screen w-64 flex-col border-r bg-white p-4 dark:bg-black">
-      <div className="flex items-center gap-2 px-2 py-4">
-        <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-blue-600 text-white">
-          <Bot size={20} />
+    <aside className="flex h-full w-64 flex-col border-r border-zinc-100 bg-white">
+      <div className="flex h-20 items-center px-8">
+        <div className="flex items-center gap-3">
+          <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-zinc-900 text-white">
+            <Bot size={18} />
+          </div>
+          <span className="font-serif text-lg font-medium tracking-tight">Kharch</span>
         </div>
-        <span className="text-xl font-semibold tracking-tight">Kharch AI</span>
       </div>
 
-      <nav className="mt-8 flex-1 space-y-1">
-        {navItems.map((item) => (
-          <button
-            key={item.label}
-            className={cn(
-              "flex w-full items-center gap-3 rounded-xl px-3 py-2 text-sm font-medium transition-colors",
-              item.active 
-                ? "bg-zinc-100 text-zinc-900 dark:bg-zinc-800 dark:text-zinc-50" 
-                : "text-zinc-500 hover:bg-zinc-50 hover:text-zinc-900 dark:text-zinc-400 dark:hover:bg-zinc-900 dark:hover:text-zinc-50"
-            )}
-          >
-            <item.icon size={18} />
-            {item.label}
-          </button>
-        ))}
+      <nav className="flex-1 space-y-1 px-4 py-6">
+        {menuItems.map((item) => {
+          const Icon = item.icon;
+          const isActive = activeView === item.id;
+          return (
+            <button
+              key={item.id}
+              onClick={() => onViewChange(item.id)}
+              className={cn(
+                "group flex w-full items-center gap-3 rounded-lg px-4 py-2.5 text-sm transition-all",
+                isActive 
+                  ? "bg-zinc-50 text-zinc-900 font-medium" 
+                  : "text-zinc-500 hover:bg-zinc-50/50 hover:text-zinc-900"
+              )}
+            >
+              <Icon size={18} className={cn("transition-colors", isActive ? "text-zinc-900" : "text-zinc-400 group-hover:text-zinc-900")} />
+              {item.label}
+            </button>
+          );
+        })}
       </nav>
 
-      <div className="border-t pt-4">
-        <div className="flex items-center gap-3 rounded-2xl p-2 hover:bg-zinc-50 dark:hover:bg-zinc-900 transition-colors">
-          <Avatar className="h-9 w-9">
-            <AvatarImage src="https://github.com/shadcn.png" />
-            <AvatarFallback>KA</AvatarFallback>
-          </Avatar>
-          <div className="flex flex-1 flex-col overflow-hidden text-left">
-            <span className="truncate text-sm font-medium">Kshitij Akarsh</span>
-            <span className="truncate text-xs text-zinc-500">Pro Plan</span>
-          </div>
-          <button className="text-zinc-400 hover:text-zinc-900 transition-colors">
-            <LogOut size={16} />
-          </button>
-        </div>
+      <div className="border-t border-zinc-100 p-4">
+        <button
+          onClick={onLogout}
+          className="flex w-full items-center gap-3 rounded-lg px-4 py-2.5 text-sm text-zinc-500 transition-colors hover:bg-red-50 hover:text-red-600"
+        >
+          <LogOut size={18} />
+          Log out
+        </button>
       </div>
-    </div>
+    </aside>
   );
 }

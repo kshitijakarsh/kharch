@@ -1,8 +1,7 @@
 "use client";
 
 import React, { useState } from 'react';
-import { Send, Mic, Sparkles } from 'lucide-react';
-import { Button } from "@/components/ui/button";
+import { Send } from 'lucide-react';
 
 interface AIInputProps {
   onSendMessage: (message: string) => void;
@@ -13,33 +12,30 @@ export function AIInput({ onSendMessage }: AIInputProps) {
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (input.trim()) {
-      onSendMessage(input);
-      setInput('');
-    }
+    if (!input.trim()) return;
+    onSendMessage(input);
+    setInput('');
   };
 
   return (
-    <div className="sticky bottom-8 left-0 right-0 mx-auto w-full max-w-2xl px-4 pb-4">
-      <div className="relative overflow-hidden rounded-3xl border border-zinc-200 bg-white shadow-xl shadow-zinc-200/50 dark:border-zinc-800 dark:bg-black dark:shadow-none">
-        <form onSubmit={handleSubmit} className="flex items-center gap-2 p-2 pl-4">
-          <Sparkles className="text-blue-500 shrink-0" size={18} />
-          <input
-            value={input}
-            onChange={(e) => setInput(e.target.value)}
-            placeholder="e.g. Spent 500 on dinner"
-            className="flex-1 bg-transparent py-3 text-sm focus:outline-none dark:text-zinc-50"
-          />
-          <div className="flex items-center gap-1">
-            <Button type="button" variant="ghost" size="icon" className="h-10 w-10 text-zinc-400 hover:text-zinc-600">
-              <Mic size={18} />
-            </Button>
-            <Button type="submit" disabled={!input.trim()} className="h-10 px-4 rounded-2xl bg-blue-600 hover:bg-blue-700 text-white">
-              <Send size={16} />
-            </Button>
-          </div>
-        </form>
-      </div>
+    <div className="w-full max-w-2xl mx-auto">
+      <form onSubmit={handleSubmit} className="relative">
+        <input
+          type="text"
+          value={input}
+          onChange={(e) => setInput(e.target.value)}
+          placeholder="e.g. Spent 500 on groceries"
+          className="w-full rounded-2xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 px-6 py-5 pr-14 text-sm font-medium transition-all focus:border-zinc-900 dark:focus:border-zinc-100 focus:outline-none placeholder:text-zinc-200 dark:placeholder:text-zinc-700 text-zinc-900 dark:text-zinc-100"
+        />
+        <button
+          type="submit"
+          disabled={!input.trim()}
+          className="absolute right-4 top-1/2 -translate-y-1/2 rounded-xl p-2 text-zinc-300 dark:text-zinc-600 transition-colors hover:text-zinc-900 dark:hover:text-zinc-100 disabled:opacity-20"
+        >
+          <Send size={20} />
+        </button>
+      </form>
     </div>
+
   );
 }

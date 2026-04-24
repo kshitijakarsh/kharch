@@ -48,3 +48,19 @@ export const getStats = async (userId: number, period: "week" | "month") => {
   return res.rows;
 };
 
+/** Daily spending totals for the current calendar month.
+ *  Returns rows like { day: "Apr 01", total: "1250.00" }
+ *  ordered by date ascending so the line chart plots left→right. */
+export const getDailyStats = async (userId: number) => {
+  const res = await pool.query(
+    `SELECT TO_CHAR(DATE_TRUNC('day', e.created_at), 'Mon DD') AS day,
+            SUM(e.amount) AS total
+     FROM expenses e
+     WHERE e.user_id = $1
+       AND DATE_TRUNC('month', e.created_at) = DATE_TRUNC('month', NOW())
+     GROUP BY DATE_TRUNC('day', e.created_at)
+     ORDER BY DATE_TRUNC('day', e.created_at) ASC`,
+    [userId]
+  );
+  return res.rows;
+};

@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { extractExpense } from "@/lib/llm";
 import { getUserCategories, findOrCreateCategory } from "@/lib/categories";
 import { addExpense } from "@/lib/expenses";
-import { ExpenseSchema } from "@/lib/validator";
+import { updateUserSalary } from "@/lib/users";
 import { cookies } from "next/headers";
 
 export async function POST(request: NextRequest) {
@@ -19,20 +19,31 @@ export async function POST(request: NextRequest) {
     const categoryNames = categories.map((c: any) => c.name);
 
     const extracted = await extractExpense(text, categoryNames);
-    const expense = ExpenseSchema.parse(extracted);
+    
+    if (extracted.type === 'salary_update') {
+      await updateUserSalary(parseInt(userId), extracted.amount);
+      return NextResponse.json({ 
+        success: true, 
+        type: 'salary_update',
+        amount: extracted.amount,
+        message: `Salary updated to ₹${extracted.amount.toLocaleString()}`
+      });
+    }
 
-    const category = await findOrCreateCategory(expense.category, parseInt(userId));
-    await addExpense(expense, parseInt(userId), category.id);
+    // Expense logic
+    const category = await findOrCreateCategory(extracted.category, parseInt(userId));
+    await addExpense(extracted, parseInt(userId), category.id);
 
     return NextResponse.json({ 
       success: true, 
+      type: 'expense',
       expense: {
-        ...expense,
+        ...extracted,
         category: category.name
       }
     });
   } catch (error) {
     console.error("AI Extraction Error:", error);
-    return NextResponse.json({ error: "Failed to parse expense" }, { status: 500 });
+    return NextResponse.json({ error: "Failed to parse input" }, { status: 500 });
   }
 }

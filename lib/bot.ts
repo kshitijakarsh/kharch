@@ -2,8 +2,9 @@ import { Bot, InlineKeyboard } from "grammy";
 import { extractExpense } from "./llm";
 import { getUserCategories, findOrCreateCategory } from "./categories";
 import { addExpense, getRecentExpenses, deleteExpense, getStats } from "./expenses";
-import { ExpenseSchema } from "./validator";
+import { updateUserSalary, getUserSalary } from "./users";
 import { pool } from "./db";
+import { LLMResponseSchema } from "./validator";
 
 let bot: Bot | null = null;
 
@@ -36,7 +37,7 @@ async function handleLoginCode(ctx: any) {
     await ctx.reply(
       `🔐 *Your Secure Login Code*\n\n` +
       `Code: \`${code}\`\n\n` +
-      `Enter this on the Kharch dashboard to log in. It will expire in 10 minutes.`,
+      `Enter this on the [Kharch Dashboard](https://kharch-two.vercel.app/) to log in. It will expire in 10 minutes.`,
       { parse_mode: "Markdown" }
     );
   } catch (error) {
@@ -45,8 +46,8 @@ async function handleLoginCode(ctx: any) {
   }
 }
 
-// --- Handler: Process Expense (AI or Manual) ---
-async function handleExpense(ctx: any, text: string) {
+// --- Handler: Process Message (AI) ---
+async function handleIncomingMessage(ctx: any, text: string) {
   const userId = ctx.from?.id;
   if (!userId || !text.trim()) return;
 
@@ -61,29 +62,45 @@ async function handleExpense(ctx: any, text: string) {
     const categoryNames = categories.map((c: any) => c.name);
 
     const extracted = await extractExpense(text, categoryNames);
-    const expense = ExpenseSchema.parse(extracted);
+    const result = LLMResponseSchema.parse(extracted);
 
-    if (expense.amount <= 0) {
-      return ctx.reply("💰 Please provide a valid amount greater than 0.");
+    if (result.type === "salary_update") {
+      await updateUserSalary(userId, result.amount);
+      return ctx.reply(
+        `✅ *Salary Updated!*\n\n` +
+        `Your monthly income is now set to *₹${result.amount.toLocaleString()}*.\n` +
+        `This helps me calculate your burn rate on the dashboard.`,
+        { parse_mode: "Markdown" }
+      );
     }
 
-    const category = await findOrCreateCategory(expense.category, userId);
-    await addExpense(expense, userId, category.id);
+    // Expense processing
+    const category = await findOrCreateCategory(result.category, userId);
+    await addExpense({
+      amount: result.amount,
+      description: result.description,
+      category: result.category,
+      isNewCategory: result.isNewCategory
+    } as any, userId, category.id);
 
-    let response = `✅ *Recorded successfully!*\n\n`;
-    response += `💰 *Amount:* ₹${expense.amount.toLocaleString()}\n`;
-    response += `📁 *Category:* ${category.name}${expense.isNewCategory ? " (New)" : ""}\n`;
-    if (expense.description) {
-      response += `📝 *Note:* ${expense.description}\n`;
+    let response = `✅ *Recorded!*\n\n`;
+    response += `💰 *Amount:* ₹${result.amount.toLocaleString()}\n`;
+    response += `📁 *Category:* ${category.name}${result.isNewCategory ? " (New)" : ""}\n`;
+    if (result.description) {
+      response += `📝 *Note:* ${result.description}\n`;
     }
 
     await ctx.reply(response, { parse_mode: "Markdown" });
   } catch (error: any) {
-    console.error("Expense processing error:", error);
-    let msg = "❌ *Oops!* I couldn't process that.";
-    if (error.name === "ZodError") msg = "❌ *Error:* Invalid data format received from AI.";
-    
-    await ctx.reply(`${msg}\n\n_Try:_ \`100 for Pizza\` or \`250 - Petrol\``, { parse_mode: "Markdown" });
+    console.error("Processing error:", error);
+    if (error.name === "ZodError") {
+      return ctx.reply("💰 Please provide a valid amount and description.");
+    }
+    await ctx.reply(
+      "❌ *Oops!* I couldn't process that.\n\n" +
+      "_Try:_ \`100 for Coffee\` or \`My salary is 80000\`",
+      { parse_mode: "Markdown" }
+    );
   }
 }
 
@@ -95,24 +112,62 @@ export default function getBot() {
     bot = new Bot(token);
 
     bot.api.setMyCommands([
-      { command: "start", description: "🏠 Welcome & Setup" },
-      { command: "code", description: "🔑 Get Login Code" },
+      { command: "start", description: "🏠 Welcome & Onboarding" },
+      { command: "salary", description: "💰 Set Monthly Income" },
+      { command: "code", description: "🔑 Get Web Login Code" },
       { command: "history", description: "📋 Recent Expenses" },
       { command: "stats", description: "📊 Spending Reports" },
       { command: "categories", description: "📁 My Categories" },
       { command: "add", description: "➕ Add Manually" },
       { command: "help", description: "❓ How to Use" },
-      { command: "clear", description: "⚠️ Reset Data" },
+      { command: "reset", description: "⚠️ Clear All Data" },
     ]);
 
-    bot.command("start", (ctx: any) => {
-      ctx.reply(
-        `🚀 *Welcome to Kharch AI!*\n\n` +
-        `I'm here to help you track your spending without the hassle. Just send me your expenses like you're talking to a friend.\n\n` +
-        `✨ *Example:* \`500 for dinner with Rahul\`\n\n` +
-        `Use /help to see all features.`,
-        { parse_mode: "Markdown" }
-      );
+    bot.command("start", async (ctx: any) => {
+      const userId = ctx.from?.id;
+      const salary = await getUserSalary(userId);
+
+      let welcomeMsg = 
+        `🚀 *Welcome to Kharch AI! Your Financial Journal.*\n\n` +
+        `I use AI to turn your messages into a professional dashboard. No more spreadsheets.\n\n` +
+        `1️⃣ *Set your Income:* Crucial for calculating your burn rate.\n` +
+        `   _Try:_ \`/salary 80000\`\n\n` +
+        `2️⃣ *Log an Expense:* Just type it naturally.\n` +
+        `   _Try:_ \`Spent 500 on lunch\`\n\n` +
+        `3️⃣ *View Dashboard:* Access the full UI here:\n` +
+        `   🔗 [kharch-two.vercel.app](https://kharch-two.vercel.app/)\n\n`;
+
+      if (salary === 0) {
+        welcomeMsg += `🚩 *Action Required:* Please set your monthly salary to unlock full analytics.`;
+      } else {
+        welcomeMsg += `✅ Current Salary: *₹${salary.toLocaleString()}*`;
+      }
+
+      await ctx.reply(welcomeMsg, { parse_mode: "Markdown" });
+    });
+
+    bot.command("reset", (ctx: any) => {
+      const keyboard = new InlineKeyboard()
+        .text("❌ Cancel", "cancel_clear")
+        .text("✅ Confirm Reset", "confirm_clear");
+      ctx.reply("⚠️ *Danger Zone*\n\nThis will permanently delete all your expense data. Are you sure?", {
+        parse_mode: "Markdown",
+        reply_markup: keyboard
+      });
+    });
+
+    bot.command("salary", async (ctx: any) => {
+      const text = ctx.message?.text?.replace("/salary", "").trim();
+      if (!text) {
+        const salary = await getUserSalary(ctx.from?.id);
+        return ctx.reply(
+          `💰 *Monthly Salary*\n\n` +
+          `Current: *₹${salary.toLocaleString()}*\n\n` +
+          `To update, type: \`/salary 80000\` or just tell me \`My salary is 80k\``,
+          { parse_mode: "Markdown" }
+        );
+      }
+      handleIncomingMessage(ctx, text);
     });
 
     bot.command("code", handleLoginCode);
@@ -151,39 +206,36 @@ export default function getBot() {
       if (!userId) return;
 
       await ctx.replyWithChatAction("typing");
-      const [w, m] = await Promise.all([getStats(userId, "week"), getStats(userId, "month")]);
+      const [w, m, salary] = await Promise.all([
+        getStats(userId, "week"), 
+        getStats(userId, "month"),
+        getUserSalary(userId)
+      ]);
 
-      let msg = "📊 *Spending Report*\n\n";
-      msg += "🗓 *Last 7 Days*\n" + (w.length ? w.map((s: any) => `• ${s.category}: ₹${s.total}`).join("\n") : "_No data_") + "\n\n";
-      msg += "🗓 *Last 30 Days*\n" + (m.length ? m.map((s: any) => `• ${s.category}: ₹${s.total}`).join("\n") : "_No data_");
+      const totalMonth = m.reduce((a: number, c: any) => a + parseFloat(c.total), 0);
+
+      let msg = "📊 *Financial Overview*\n\n";
+      if (salary > 0) {
+        const burn = (totalMonth / salary) * 100;
+        msg += `💰 *Salary:* ₹${salary.toLocaleString()}\n`;
+        msg += `🔥 *Burn Rate:* ${burn.toFixed(1)}%\n\n`;
+      }
+      
+      msg += "🗓 *Last 7 Days*\n" + (w.length ? w.map((s: any) => `• ${s.category}: ₹${s.total}`).join("\n") : "_No activity_") + "\n\n";
+      msg += "🗓 *Last 30 Days*\n" + (m.length ? m.map((s: any) => `• ${s.category}: ₹${s.total}`).join("\n") : "_No activity_");
 
       await ctx.reply(msg, { parse_mode: "Markdown" });
     });
 
-    bot.command("clear", (ctx: any) => {
-      const keyboard = new InlineKeyboard()
-        .text("❌ Cancel", "cancel_clear")
-        .text("✅ Confirm Reset", "confirm_clear");
-      ctx.reply("⚠️ *Danger Zone*\n\nThis will permanently delete all your expense data. Are you sure?", {
-        parse_mode: "Markdown",
-        reply_markup: keyboard
-      });
-    });
-
-    bot.command("add", (ctx: any) => {
-      const text = ctx.message?.text?.replace("/add", "").trim();
-      if (!text) return ctx.reply("❓ *Usage:* \`/add 50 for Tea\`");
-      handleExpense(ctx, text);
-    });
 
     bot.command("help", (ctx: any) => {
       ctx.reply(
         `📖 *Kharch AI Guide*\n\n` +
-        `• *Natural Language:* Just type \`100 for snacks\`\n` +
-        `• *Shorthand:* \`Petrol 500\` or \`200 - Lunch\`\n` +
-        `• *Dashboard:* Use /code to log into the web UI\n` +
-        `• *Management:* Use /history to delete entries\n\n` +
-        `I'll automatically categorize your spending!`,
+        `• *Expenses:* Just type \`100 for snacks\`\n` +
+        `• *Salary:* Type \`My salary is 80000\` or use /salary\n` +
+        `• *Dashboard:* [kharch-two.vercel.app](https://kharch-two.vercel.app/)\n` +
+        `• *Stats:* Use /stats to see your burn rate\n\n` +
+        `I automatically handle everything through natural language!`,
         { parse_mode: "Markdown" }
       );
     });
@@ -201,8 +253,7 @@ export default function getBot() {
         }
       } else if (data === "confirm_clear") {
         await pool.query("DELETE FROM expenses WHERE user_id = $1", [userId]);
-        await pool.query("DELETE FROM categories WHERE user_id = $1", [userId]);
-        await ctx.editMessageText("💥 *All data has been wiped clean.*", { parse_mode: "Markdown" });
+        await ctx.editMessageText("💥 *Expense history has been wiped.*", { parse_mode: "Markdown" });
       } else if (data === "cancel_clear") {
         await ctx.editMessageText("Whew! Action cancelled. 😅", { parse_mode: "Markdown" });
       }
@@ -210,15 +261,8 @@ export default function getBot() {
 
     bot.on("message:text", (ctx: any) => {
       const text = ctx.message.text;
-      
-      // If it starts with / but wasn't caught by bot.command() handlers above
-      if (text.startsWith("/")) {
-        return ctx.reply("❓ *Unknown Command*\n\nTry /help to see all available commands.", { 
-          parse_mode: "Markdown" 
-        });
-      }
-
-      handleExpense(ctx, text);
+      if (text.startsWith("/")) return; // Handled by command listeners
+      handleIncomingMessage(ctx, text);
     });
 
   }

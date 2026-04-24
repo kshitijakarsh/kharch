@@ -1,233 +1,354 @@
 "use client";
 
 import React, { useState, useEffect } from 'react';
-import { Header } from "@/components/layout/Header";
-import { SummaryCard } from "@/components/dashboard/SummaryCard";
+import { SummaryCard }  from "@/components/dashboard/SummaryCard";
 import { ChartSection } from "@/components/dashboard/ChartSection";
-import { ExpenseList } from "@/components/dashboard/ExpenseList";
-import { AIInput } from "@/components/ai/AIInput";
-import { ChatMessage } from "@/components/ai/ChatMessage";
-import { Wallet, Calendar, CreditCard, TrendingUp, MessageSquare, LayoutDashboard, Bot, Lock } from 'lucide-react';
+import { AIInput }      from "@/components/ai/AIInput";
+import { ChatMessage }  from "@/components/ai/ChatMessage";
+import { ExpenseTable } from "@/components/dashboard/ExpenseTable";
+import {
+  Wallet, Calendar, CreditCard, Bot, Sparkles, X, TrendingUp,
+} from 'lucide-react';
 import { Button } from "@/components/ui/button";
-import { cn } from "@/lib/utils";
+import { cn }    from "@/lib/utils";
 
+/* ─── Types ─────────────────────────────────────────────────── */
 interface Message {
   role: 'user' | 'assistant';
   content: string;
   data?: any;
 }
 
+/* ─── Component ──────────────────────────────────────────────── */
 export default function Home() {
   const [isLoggedIn, setIsLoggedIn] = useState<boolean | null>(null);
-  const [view, setView] = useState<'chat' | 'dashboard'>('chat');
   const [messages, setMessages] = useState<Message[]>([
-    { role: 'assistant', content: 'Hello! I am your Kharch AI. Just type your expense and I will handle the rest.' }
+    { role: 'assistant', content: 'Hello! I am your Kharch AI. Just type your expense and I will handle the rest.' },
   ]);
   const [expenses, setExpenses] = useState<any[]>([]);
-  const [stats, setStats] = useState<any>({ week: [], month: [] });
-  const [loading, setLoading] = useState(true);
+  const [stats,    setStats]    = useState<any>({ week: [], month: [], daily: [], salary: 0 });
+  const [loading,  setLoading]  = useState(true);
+  const [isChatOpen, setIsChatOpen] = useState(false);
+  const [loginCode,  setLoginCode]  = useState('');
+  const [authError,  setAuthError]  = useState('');
 
-  const checkAuth = async () => {
-    try {
-      const res = await fetch('/api/auth/me');
-      if (res.ok) {
-        setIsLoggedIn(true);
-        fetchData();
-      } else {
-        setIsLoggedIn(false);
-      }
-    } catch (error) {
-      setIsLoggedIn(false);
-    } finally {
-      setLoading(false);
-    }
-  };
-
+  /* ── Data fetching ─────────────────────────────────────────── */
   const fetchData = async () => {
     try {
       const [expRes, statRes] = await Promise.all([
         fetch('/api/expenses'),
-        fetch('/api/stats')
+        fetch('/api/stats'),
       ]);
-      const expData = await expRes.json();
+      const expData  = await expRes.json();
       const statData = await statRes.json();
-      if (Array.isArray(expData)) setExpenses(expData);
+      if (Array.isArray(expData))          setExpenses(expData);
       if (statData.week && statData.month) setStats(statData);
     } catch (e) { console.error(e); }
   };
 
-  useEffect(() => { checkAuth(); }, []);
-
-  const handleSendMessage = async (content: string) => {
-    const userMsg: Message = { role: 'user', content };
-    setMessages(prev => [...prev, userMsg]);
+  const checkAuth = async () => {
     try {
-      const res = await fetch('/api/ai/extract', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ text: content })
-      });
-      const result = await res.json();
-      if (result.success) {
-        setMessages(prev => [...prev, {
-          role: 'assistant',
-          content: `✅ Recorded ₹${result.expense.amount} in ${result.expense.category}.`,
-          data: result.expense
-        }]);
-        fetchData();
-      }
-    } catch (e) {
-      setMessages(prev => [...prev, { role: 'assistant', content: "Something went wrong. Please try again." }]);
-    }
+      const res = await fetch('/api/auth/me');
+      if (res.ok) { setIsLoggedIn(true); fetchData(); }
+      else        { setIsLoggedIn(false); }
+    } catch { setIsLoggedIn(false); }
+    finally  { setLoading(false); }
   };
 
-  const [loginCode, setLoginCode] = useState('');
-  const [authError, setAuthError] = useState('');
+  useEffect(() => { checkAuth(); }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
+  /* ── Derived values ────────────────────────────────────────── */
+  const totalSpent = stats.month.reduce((a: number, c: any) => a + parseFloat(c.total),  0);
+  const weekSpent  = stats.week .reduce((a: number, c: any) => a + parseFloat(c.total),  0);
+  const grandTotal = expenses   .reduce((a: number, c: any) => a + parseFloat(c.amount), 0);
+  const salary     = stats.salary ?? 0;
+  const burnRate   = salary > 0 ? (totalSpent / salary) * 100 : 0;
+  const pieData    = stats.month.map((s: any) => ({ name: s.category, value: parseFloat(s.total) }));
+  const lineData   = (stats.daily ?? []).map((s: any) => ({ date: s.day, amount: parseFloat(s.total) }));
+
+  /* ── Handlers ──────────────────────────────────────────────── */
   const handleVerify = async () => {
     setAuthError('');
     try {
-      const res = await fetch('/api/auth/verify', {
+      const res    = await fetch('/api/auth/verify', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ code: loginCode })
+        body: JSON.stringify({ code: loginCode }),
+      });
+      const result = await res.json();
+      if (result.success) { setIsLoggedIn(true); fetchData(); }
+      else                { setAuthError(result.error || 'Invalid code'); }
+    } catch { setAuthError('Failed to connect to server'); }
+  };
+
+  const handleSendMessage = async (content: string) => {
+    setMessages(prev => [...prev, { role: 'user', content }]);
+    try {
+      const res    = await fetch('/api/ai/extract', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ text: content }),
       });
       const result = await res.json();
       if (result.success) {
-        setIsLoggedIn(true);
+        const reply = result.type === 'salary_update'
+          ? result.message
+          : `Recorded ₹${result.expense.amount} for ${result.expense.category}.`;
+        setMessages(prev => [...prev, { role: 'assistant', content: reply }]);
         fetchData();
       } else {
-        setAuthError(result.error || "Invalid code");
+        setMessages(prev => [...prev, { role: 'assistant', content: "I couldn't process that. Try again?" }]);
       }
-    } catch (e) {
-      setAuthError("Failed to connect to server");
+    } catch {
+      setMessages(prev => [...prev, { role: 'assistant', content: 'Connection lost. Please try again.' }]);
     }
   };
 
+  const handleLogout = async () => {
+    await fetch('/api/auth/logout', { method: 'POST' });
+    setIsLoggedIn(false);
+  };
+
+  /* ─── Loading ────────────────────────────────────────────────── */
   if (loading) return (
-    <div className="flex h-screen items-center justify-center bg-white dark:bg-black">
-      <Bot className="animate-pulse text-blue-600" size={48} />
+    <div className="flex h-screen items-center justify-center bg-zinc-950">
+      <Bot className="animate-pulse text-zinc-100" size={40} />
     </div>
   );
 
+  /* ─── Login / Landing ────────────────────────────────────────── */
   if (!isLoggedIn) return (
-    <div className="flex h-screen flex-col items-center justify-center bg-zinc-50 px-4 dark:bg-black">
-      <div className="w-full max-w-sm space-y-8">
-        <div className="text-center space-y-4">
-          <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-2xl bg-blue-600 text-white shadow-xl shadow-blue-500/20">
-            <Bot size={32} />
+    <div className="min-h-screen bg-zinc-950 selection:bg-zinc-100 selection:text-zinc-900">
+
+      {/* Header */}
+      <header className="sticky top-0 z-50 flex h-20 items-center justify-between px-8 lg:px-16 bg-zinc-950/80 backdrop-blur-sm border-b border-zinc-800">
+        <div className="flex items-center gap-2.5">
+          <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-zinc-100 text-zinc-900">
+            <Bot size={18} />
           </div>
-          <div className="space-y-2">
-            <h1 className="text-2xl font-bold tracking-tight">Login to Kharch AI</h1>
-            <p className="text-sm text-zinc-500">
-              Message <span className="font-mono font-bold text-blue-600">/code</span> to the Kharch Bot on Telegram to get your login code.
+          <span className="font-serif text-xl text-zinc-100">Kharch</span>
+        </div>
+      </header>
+
+      {/* Hero */}
+      <main className="mx-auto max-w-5xl px-8 lg:px-16 py-32 text-center">
+        <h1 className="text-7xl lg:text-9xl font-serif text-zinc-50 leading-[0.85] tracking-tighter mb-12">
+          Financial clarity, <br /> recorded with poise.
+        </h1>
+        <p className="text-xl text-zinc-400 max-w-2xl mx-auto leading-relaxed mb-16">
+          An AI-powered financial journal that understands your context. Minimalist, private, and structured entirely by you.
+        </p>
+
+        {/* Login card */}
+        <div className="max-w-md mx-auto">
+          <div className="p-10 border border-zinc-800 rounded-2xl bg-zinc-900">
+            <p className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest mb-6">
+              Enter Verification Code
+            </p>
+            <div className="space-y-4">
+              <input
+                type="text"
+                placeholder="000 000"
+                maxLength={6}
+                value={loginCode}
+                onChange={(e) => setLoginCode(e.target.value)}
+                onKeyDown={(e) => e.key === 'Enter' && loginCode.length === 6 && handleVerify()}
+                className="w-full rounded-xl border border-zinc-700 bg-zinc-950 px-4 py-5 text-center text-4xl font-bold text-zinc-50 focus:outline-none focus:ring-1 focus:ring-zinc-400 transition-all placeholder:text-zinc-700"
+              />
+              {authError && (
+                <p className="text-xs text-red-400">{authError}</p>
+              )}
+              <Button
+                className="w-full bg-zinc-100 py-8 text-sm font-bold text-zinc-900 hover:bg-zinc-300 rounded-xl transition-colors"
+                disabled={loginCode.length !== 6}
+                onClick={handleVerify}
+              >
+                Access Journal
+              </Button>
+            </div>
+            <p className="text-[10px] text-zinc-600 mt-8 uppercase tracking-widest">
+              Send /code to Kharch Bot on Telegram
             </p>
           </div>
         </div>
+      </main>
 
-        <div className="space-y-6 rounded-3xl bg-white p-8 shadow-sm border dark:bg-zinc-900">
-          <div className="space-y-2">
-            <label className="text-xs font-semibold uppercase tracking-wider text-zinc-500">Verification Code</label>
-            <input 
-              type="text" 
-              placeholder="e.g. 123456"
-              maxLength={6}
-              value={loginCode}
-              onChange={(e) => setLoginCode(e.target.value)}
-              className="w-full rounded-xl border bg-zinc-50 px-4 py-4 text-center text-xl font-mono tracking-widest focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-black"
-            />
+      {/* Features */}
+      <section className="grid grid-cols-1 md:grid-cols-3 gap-16 px-8 lg:px-16 py-32 border-t border-zinc-800">
+        {[
+          { title: 'Natural Recording',  desc: 'Speak or type. Our AI parses categories and amounts with zero effort from your end.' },
+          { title: 'Editorial Reports',  desc: 'No loud charts. Just clean, bordered visualisations that tell a story about your capital.' },
+          { title: 'Absolute Privacy',   desc: 'Code-only login and isolated data ensures your finances remain yours alone.' },
+        ].map((f, i) => (
+          <div key={i} className="space-y-4">
+            <h3 className="text-3xl font-serif text-zinc-100 leading-none">{f.title}</h3>
+            <p className="text-zinc-500 text-sm leading-relaxed">{f.desc}</p>
           </div>
-          
-          {authError && (
-            <p className="text-xs font-medium text-red-500 text-center">{authError}</p>
-          )}
-
-          <Button 
-            className="w-full bg-blue-600 py-7 text-base font-semibold hover:bg-blue-700 rounded-2xl shadow-lg shadow-blue-500/20"
-            disabled={loginCode.length !== 6}
-            onClick={handleVerify}
-          >
-            Sign In
-          </Button>
-        </div>
-
-        <p className="text-xs text-center text-zinc-400 flex items-center justify-center gap-1">
-          <Lock size={12} /> Secure, encrypted per-user data isolation
-        </p>
-      </div>
+        ))}
+      </section>
     </div>
   );
 
-
-  const totalSpent = stats.month.reduce((acc: number, curr: any) => acc + parseFloat(curr.total), 0);
-  const weekSpent = stats.week.reduce((acc: number, curr: any) => acc + parseFloat(curr.total), 0);
-  const pieData = stats.month.map((s: any) => ({ name: s.category, value: parseFloat(s.total) }));
-  const lineData = stats.week.map((s: any) => ({ date: s.category.substring(0, 3), amount: parseFloat(s.total) }));
-
+  /* ─── Dashboard ──────────────────────────────────────────────── */
   return (
-    <div className="flex h-screen bg-white dark:bg-black overflow-hidden font-sans">
-      <div className="flex flex-1 flex-col overflow-hidden">
-        
-        {/* Simplified Header */}
-        <header className="flex h-16 items-center justify-between border-b px-6">
-          <div className="flex items-center gap-2">
-            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-blue-600 text-white">
+    <div className="min-h-screen bg-zinc-950 selection:bg-zinc-100 selection:text-zinc-900">
+
+      {/* Navbar */}
+      <nav className="sticky top-0 z-50 bg-zinc-950/80 backdrop-blur-sm border-b border-zinc-800">
+        <div className="max-w-6xl mx-auto h-16 flex items-center justify-between px-8">
+          <div className="flex items-center gap-2.5">
+            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-zinc-100 text-zinc-900">
               <Bot size={18} />
             </div>
-            <span className="font-semibold tracking-tight">Kharch AI</span>
+            <span className="font-serif text-lg text-zinc-100">Kharch</span>
           </div>
 
-          <div className="flex bg-zinc-100 p-1 rounded-xl dark:bg-zinc-900">
-            <button 
-              onClick={() => setView('chat')}
-              className={cn(
-                "flex items-center gap-2 px-4 py-1.5 text-sm font-medium rounded-lg transition-all",
-                view === 'chat' ? "bg-white shadow-sm text-blue-600 dark:bg-black" : "text-zinc-500 hover:text-zinc-900"
-              )}
-            >
-              <MessageSquare size={16} /> Chat
-            </button>
-            <button 
-              onClick={() => setView('dashboard')}
-              className={cn(
-                "flex items-center gap-2 px-4 py-1.5 text-sm font-medium rounded-lg transition-all",
-                view === 'dashboard' ? "bg-white shadow-sm text-blue-600 dark:bg-black" : "text-zinc-500 hover:text-zinc-900"
-              )}
-            >
-              <LayoutDashboard size={16} /> Dashboard
-            </button>
-          </div>
-        </header>
-
-        <main className="flex-1 overflow-hidden relative">
-          
-          {/* Chat View */}
-          {view === 'chat' && (
-            <div className="h-full flex flex-col max-w-3xl mx-auto w-full relative">
-              <div className="flex-1 overflow-y-auto p-6 space-y-6 scrollbar-hide pb-32">
-                {messages.map((msg, i) => (
-                  <ChatMessage key={i} role={msg.role} content={msg.content} data={msg.data} />
-                ))}
-              </div>
-              <AIInput onSendMessage={handleSendMessage} />
+          <div className="flex items-center gap-3">
+            {/* Avatar */}
+            <div className="h-8 w-8 rounded-full border border-zinc-700 flex items-center justify-center text-[10px] font-bold bg-zinc-800 text-zinc-100">
+              KA
             </div>
-          )}
+            {/* Logout */}
+            <button
+              onClick={handleLogout}
+              className="text-[10px] font-bold text-zinc-500 hover:text-red-400 transition-colors uppercase tracking-widest"
+            >
+              Log Out
+            </button>
+          </div>
+        </div>
+      </nav>
 
-          {/* Dashboard View */}
-          {view === 'dashboard' && (
-            <div className="h-full overflow-y-auto p-6 scrollbar-hide">
-              <div className="mx-auto max-w-5xl space-y-8">
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                  <SummaryCard title="Month" value={`₹${totalSpent}`} icon={Wallet} color="bg-blue-50 text-blue-600" />
-                  <SummaryCard title="Week" value={`₹${weekSpent}`} icon={Calendar} color="bg-purple-50 text-purple-600" />
-                  <SummaryCard title="Top Category" value={stats.month[0]?.category || "N/A"} icon={CreditCard} color="bg-orange-50 text-orange-600" />
+      {/* Main */}
+      <main className="max-w-6xl mx-auto px-8 pb-48">
+        <section id="dashboard" className="py-20 space-y-24">
+
+          {/* ── Your Capital ────────────────────────────────────── */}
+          <div className="space-y-12">
+            <div className="flex items-end justify-between border-b border-zinc-800 pb-8">
+              <div className="space-y-2">
+                <span className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest">
+                  Financial Summary
+                </span>
+                <h1 className="text-5xl font-serif text-zinc-50 leading-none">
+                  Your Capital
+                </h1>
+              </div>
+
+              <div className="flex gap-12 text-right">
+                <div className="space-y-1">
+                  <p className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest">Salary</p>
+                  <p className="text-2xl font-serif text-zinc-100 tabular-nums">
+                    ₹{salary.toLocaleString()}
+                  </p>
                 </div>
-                <ChartSection lineData={lineData} pieData={pieData} />
-                <ExpenseList expenses={expenses} />
+                <div className="space-y-1">
+                  <p className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest">Burn Rate</p>
+                  <p className={cn(
+                    'text-2xl font-serif tabular-nums',
+                    burnRate > 80 ? 'text-red-400' : 'text-zinc-100',
+                  )}>
+                    {burnRate.toFixed(1)}%
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            {/* Summary cards */}
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+              <SummaryCard title="Monthly"  value={`₹${totalSpent.toLocaleString()}`} icon={Wallet}     color="text-zinc-300" />
+              <SummaryCard title="Weekly"   value={`₹${weekSpent .toLocaleString()}`} icon={Calendar}   color="text-zinc-400" />
+              <SummaryCard title="Total"    value={`₹${grandTotal.toLocaleString()}`} icon={CreditCard} color="text-zinc-500" />
+              <SummaryCard title="Salary"   value={`₹${salary    .toLocaleString()}`} icon={TrendingUp} color="text-zinc-300" />
+            </div>
+
+            {/* Charts */}
+            <div className="border border-zinc-800 rounded-2xl p-10 bg-zinc-900/30">
+              <ChartSection lineData={lineData} pieData={pieData} />
+            </div>
+          </div>
+
+          {/* ── Ledger ──────────────────────────────────────────── */}
+          <div className="space-y-8">
+            <div className="flex items-center justify-between border-b border-zinc-800 pb-6">
+              <h2 className="text-3xl font-serif text-zinc-100">Recent Ledger</h2>
+              <button className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest hover:text-zinc-100 transition-colors">
+                Export CSV
+              </button>
+            </div>
+            <ExpenseTable expenses={expenses} />
+          </div>
+
+        </section>
+      </main>
+
+      {/* ── Floating AI Assistant ──────────────────────────────── */}
+      <div className="fixed bottom-8 left-1/2 -translate-x-1/2 z-50 w-full max-w-2xl px-6">
+
+        {/* Chat window */}
+        <div className={cn(
+          "mb-4 overflow-hidden rounded-3xl border border-zinc-800 bg-zinc-950 transition-all duration-500 ease-in-out shadow-2xl shadow-black/40",
+          isChatOpen
+            ? "h-[480px] opacity-100 scale-100"
+            : "h-0 opacity-0 scale-95 pointer-events-none"
+        )}>
+          <div className="flex h-full flex-col">
+            {/* Chat header */}
+            <div className="flex items-center justify-between border-b border-zinc-800 px-8 py-5 bg-zinc-900/50">
+              <div className="flex items-center gap-3">
+                <div className="h-8 w-8 rounded-full bg-zinc-100 text-zinc-900 flex items-center justify-center">
+                  <Bot size={16} />
+                </div>
+                <div>
+                  <h2 className="text-sm font-bold text-zinc-100">Kharch Assistant</h2>
+                  <p className="text-[10px] text-zinc-500 font-bold uppercase tracking-widest">Always Learning</p>
+                </div>
+              </div>
+              <button
+                onClick={() => setIsChatOpen(false)}
+                className="h-8 w-8 flex items-center justify-center rounded-full hover:bg-zinc-800 text-zinc-500 hover:text-zinc-200 transition-colors"
+              >
+                <X size={14} />
+              </button>
+            </div>
+
+            {/* Messages */}
+            <div className="flex-1 overflow-y-auto p-6 space-y-4 scroll-smooth">
+              {messages.map((msg, i) => (
+                <ChatMessage key={i} {...msg} />
+              ))}
+            </div>
+          </div>
+        </div>
+
+        {/* Input bar */}
+        <div
+          onClick={() => !isChatOpen && setIsChatOpen(true)}
+          className={cn(
+            "group flex h-20 w-full items-center gap-4 rounded-3xl border border-zinc-800 bg-zinc-900/90 px-6 backdrop-blur-xl transition-all duration-300",
+            !isChatOpen && "cursor-pointer hover:border-zinc-600 hover:scale-[1.01] active:scale-[0.99]"
+          )}
+        >
+          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-zinc-100 text-zinc-900 transition-transform group-hover:rotate-12">
+            <Bot size={20} />
+          </div>
+
+          {isChatOpen ? (
+            <AIInput onSendMessage={handleSendMessage} />
+          ) : (
+            <div className="flex flex-1 items-center justify-between">
+              <span className="text-sm text-zinc-500">
+                Ask anything about your expenses…
+              </span>
+              <div className="flex items-center gap-2">
+                <span className="text-[10px] font-bold text-zinc-600 uppercase tracking-widest border border-zinc-800 bg-zinc-900 px-2 py-1 rounded-md">
+                  ⌘ K
+                </span>
+                <Sparkles size={14} className="text-zinc-600" />
               </div>
             </div>
           )}
-        </main>
+        </div>
       </div>
     </div>
   );

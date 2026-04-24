@@ -1,57 +1,98 @@
-import { ShoppingBag, Coffee, Car, Home, MoreHorizontal, Receipt } from 'lucide-react';
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
+import { ShoppingBag, Coffee, Car, Home, Receipt } from 'lucide-react';
+import { cn } from "@/lib/utils";
 
 interface ExpenseListProps {
   expenses: any[];
 }
 
+/* Category → icon + colour pill.
+   Light mode: pastel tint on white — no grey fills.
+   Dark mode:  low-opacity colour fill on zinc-900 surface. */
 const getCategoryIcon = (name: string) => {
   const n = name.toLowerCase();
-  if (n.includes('food')) return { icon: Coffee, color: 'bg-orange-50 text-orange-600' };
-  if (n.includes('travel') || n.includes('transport')) return { icon: Car, color: 'bg-purple-50 text-purple-600' };
-  if (n.includes('shop')) return { icon: ShoppingBag, color: 'bg-blue-50 text-blue-600' };
-  if (n.includes('house') || n.includes('rent')) return { icon: Home, color: 'bg-green-50 text-green-600' };
-  return { icon: Receipt, color: 'bg-zinc-50 text-zinc-600' };
+  if (n.includes('food') || n.includes('coffee') || n.includes('restaurant'))
+    return { icon: Coffee,      color: 'bg-orange-50 dark:bg-orange-500/10 text-orange-600 dark:text-orange-400' };
+  if (n.includes('travel') || n.includes('transport') || n.includes('petrol'))
+    return { icon: Car,         color: 'bg-purple-50 dark:bg-purple-500/10 text-purple-600 dark:text-purple-400' };
+  if (n.includes('shop') || n.includes('shopping'))
+    return { icon: ShoppingBag, color: 'bg-sky-50    dark:bg-sky-500/10    text-sky-600    dark:text-sky-400'    };
+  if (n.includes('house') || n.includes('rent') || n.includes('home'))
+    return { icon: Home,        color: 'bg-emerald-50 dark:bg-emerald-500/10 text-emerald-600 dark:text-emerald-400' };
+  /* fallback — white bg with a border in light; zinc-800 in dark */
+  return   { icon: Receipt,     color: 'bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 text-zinc-500 dark:text-zinc-400' };
 };
 
 export function ExpenseList({ expenses }: ExpenseListProps) {
   return (
-    <Card className="border-none shadow-sm dark:bg-zinc-900">
-      <CardHeader className="flex flex-row items-center justify-between pb-2">
-        <CardTitle className="text-base font-medium text-zinc-500">Recent Transactions</CardTitle>
-        <Button variant="ghost" size="sm" className="text-xs text-blue-600 hover:text-blue-700">View All</Button>
-      </CardHeader>
-      <CardContent>
-        <div className="space-y-4">
-          {expenses.length === 0 && (
-            <p className="text-sm text-center py-8 text-zinc-500">No expenses found.</p>
-          )}
-          {expenses.map((expense) => {
-            const { icon: Icon, color } = getCategoryIcon(expense.category_name || "");
-            return (
-              <div key={expense.id} className="flex items-center justify-between group">
-                <div className="flex items-center gap-4">
-                  <div className={`flex h-10 w-10 items-center justify-center rounded-xl ${color} dark:bg-opacity-10`}>
-                    <Icon size={18} />
-                  </div>
-                  <div>
-                    <p className="text-sm font-medium text-zinc-900 dark:text-zinc-50">{expense.description || "No description"}</p>
-                    <p className="text-xs text-zinc-500">{expense.category_name} • {new Date(expense.created_at).toLocaleDateString()}</p>
-                  </div>
+    <div className="space-y-6">
+      {/* Section header */}
+      <div className="flex items-center justify-between">
+        <span className="text-[10px] font-bold uppercase tracking-widest text-zinc-400">
+          Recent Transactions
+        </span>
+        <button className="text-[10px] uppercase tracking-widest font-bold text-zinc-900 dark:text-zinc-100 hover:text-zinc-400 dark:hover:text-zinc-500 transition-colors">
+          View History
+        </button>
+      </div>
+
+      {/* List */}
+      <div className="flex flex-col divide-y divide-zinc-100 dark:divide-zinc-800">
+        {expenses.length === 0 && (
+          /* Empty state — white bg, dashed border, no fill */
+          <div className="text-center py-20 rounded-2xl border border-dashed border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-950">
+            <Receipt className="mx-auto text-zinc-200 dark:text-zinc-700 mb-4" size={36} />
+            <p className="text-sm text-zinc-400 font-medium">No activity recorded yet.</p>
+            <p className="text-[10px] text-zinc-300 dark:text-zinc-600 mt-1 uppercase tracking-widest">
+              Tell the assistant your first expense
+            </p>
+          </div>
+        )}
+
+        {expenses.map((expense) => {
+          const { icon: Icon, color } = getCategoryIcon(expense.category_name ?? '');
+          const date = new Date(expense.created_at).toLocaleDateString(undefined, {
+            month: 'short', day: 'numeric',
+          });
+
+          return (
+            <div
+              key={expense.id}
+              className="group flex items-center justify-between py-5 transition-colors"
+            >
+              <div className="flex items-center gap-4">
+                {/* Icon pill */}
+                <div className={cn(
+                  'flex h-10 w-10 items-center justify-center rounded-xl shrink-0 transition-transform group-hover:scale-105',
+                  color,
+                )}>
+                  <Icon size={18} />
                 </div>
-                <div className="flex items-center gap-4">
-                  <span className="text-sm font-semibold text-zinc-900 dark:text-zinc-50">₹{expense.amount}</span>
-                  <Button variant="ghost" size="icon" className="h-8 w-8 text-zinc-400 opacity-0 group-hover:opacity-100 transition-opacity">
-                    <MoreHorizontal size={14} />
-                  </Button>
+
+                {/* Meta */}
+                <div>
+                  <p className="text-sm font-bold text-zinc-900 dark:text-zinc-100 leading-snug">
+                    {expense.description || 'Unlabeled Expense'}
+                  </p>
+                  <div className="flex items-center gap-2 mt-1">
+                    <span className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest">
+                      {expense.category_name}
+                    </span>
+                    <span className="h-0.5 w-0.5 rounded-full bg-zinc-200 dark:bg-zinc-700" />
+                    <span className="text-[10px] text-zinc-400 uppercase tracking-widest">
+                      {date}
+                    </span>
+                  </div>
                 </div>
               </div>
-            );
-          })}
-        </div>
-      </CardContent>
-    </Card>
+
+              {/* Amount */}
+              <span className="text-xl font-serif text-zinc-900 dark:text-zinc-50 tabular-nums">
+                ₹{parseFloat(expense.amount).toLocaleString()}
+              </span>
+            </div>
+          );
+        })}
+      </div>
+    </div>
   );
 }
-

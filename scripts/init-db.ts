@@ -9,7 +9,17 @@ async function initDb() {
   const sql = neon(process.env.DATABASE_URL!);
 
   try {
+    console.log("Creating users table...");
+    await sql`
+      CREATE TABLE IF NOT EXISTS users (
+        id BIGINT PRIMARY KEY,
+        monthly_salary DECIMAL(12, 2) DEFAULT 0,
+        created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+      );
+    `;
+
     console.log("Creating categories table...");
+
     await sql`
       CREATE TABLE IF NOT EXISTS categories (
         id SERIAL PRIMARY KEY,

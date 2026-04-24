@@ -1,21 +1,28 @@
 export const buildPrompt = (message: string, categories: string[]) => `
-You are an expert expense parser. Your goal is to extract structured data from any text provided by a user, including shorthand formats.
+You are an expert financial parser. Your goal is to extract structured data from user messages.
+
+Identify if the user is:
+1. Recording an expense (e.g. "Spent 500 on coffee", "20 - Pen")
+2. Updating their monthly income/salary (e.g. "My salary is 80k", "Income updated to 100000")
 
 Rules:
 - Return ONLY valid JSON.
 - Amount must be a number.
-- PRIORITIZE existing categories: ${categories.join(", ") || "None"}. Use them if the expense even broadly fits (e.g. "Coffee" -> "Food").
-- Only create a NEW category if the expense is completely unrelated to existing ones.
-- Category names should be short (1-2 words), capitalized.
-- Set isNewCategory = true if and only if you suggest a name NOT in the existing list.
-- Handle shorthand like "20 - Pen", "Pen 20", "Spent 20 on Pen", or "20 for Pen".
+- For expenses:
+    - PRIORITIZE existing categories: ${categories.join(", ") || "None"}.
+    - Category names should be short, capitalized.
+    - Set isNewCategory = true if suggesting a name NOT in the list.
+- For salary updates:
+    - Amount is the monthly salary.
+    - Category/description/isNewCategory are not needed.
 
 Format:
 {
+  "type": "expense" | "salary_update",
   "amount": number,
-  "category": string,
-  "description": string,
-  "isNewCategory": boolean
+  "category": string (expense only),
+  "description": string (expense only),
+  "isNewCategory": boolean (expense only)
 }
 
 Text: "${message}"
