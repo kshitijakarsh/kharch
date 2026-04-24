@@ -31,10 +31,14 @@ async function handleExpense(ctx: any, text: string) {
     }
 
     await ctx.reply(response, { parse_mode: "Markdown" });
-  } catch (error) {
+  } catch (error: any) {
     console.error("Expense processing error:", error);
+    
+    let errorMessage = "❌ *Oops!* I encountered an error while processing that.";
+    const technical = error.message ? `\n\n_Error:_ \`${error.message.substring(0, 100)}\`` : "";
+
     await ctx.reply(
-      "❌ *Oops!* I couldn't understand that. \nTry: `Spent 50 on snacks` or `100 - Petrol`",
+      `${errorMessage}${technical}\n\nTry: \`Spent 50 on snacks\` or \`100 - Petrol\``,
       { parse_mode: "Markdown" }
     );
   }
