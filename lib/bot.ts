@@ -3,15 +3,58 @@ import { extractExpense } from "./llm";
 import { getUserCategories, findOrCreateCategory } from "./categories";
 import { addExpense, getRecentExpenses, deleteExpense, getStats } from "./expenses";
 import { ExpenseSchema } from "./validator";
+import { pool } from "./db";
 
 let bot: Bot | null = null;
 
-async function handleExpense(ctx: any, text: string) {
+// --- Helper: Clean up expired codes ---
+async function cleanupCodes() {
+  try {
+    await pool.query("DELETE FROM auth_codes WHERE expires_at < NOW()");
+  } catch (e) {
+    console.error("Cleanup error:", e);
+  }
+}
+
+// --- Handler: Generate Login Code ---
+async function handleLoginCode(ctx: any) {
   const userId = ctx.from?.id;
   if (!userId) return;
 
+  await cleanupCodes();
+  const code = Math.floor(100000 + Math.random() * 900000).toString();
+  const expiresAt = new Date(Date.now() + 10 * 60 * 1000); // 10 mins
+
   try {
-    // Show that the bot is thinking/typing
+    // Remove any existing codes for this user first
+    await pool.query("DELETE FROM auth_codes WHERE user_id = $1", [userId]);
+    await pool.query(
+      "INSERT INTO auth_codes (user_id, code, expires_at) VALUES ($1, $2, $3)",
+      [userId, code, expiresAt]
+    );
+
+    await ctx.reply(
+      `🔐 *Your Secure Login Code*\n\n` +
+      `Code: \`${code}\`\n\n` +
+      `Enter this on the Kharch dashboard to log in. It will expire in 10 minutes.`,
+      { parse_mode: "Markdown" }
+    );
+  } catch (error) {
+    console.error("Auth code error:", error);
+    await ctx.reply("❌ Failed to generate code. Please try again.");
+  }
+}
+
+// --- Handler: Process Expense (AI or Manual) ---
+async function handleExpense(ctx: any, text: string) {
+  const userId = ctx.from?.id;
+  if (!userId || !text.trim()) return;
+
+  if (text.length > 500) {
+    return ctx.reply("⚠️ That message is a bit too long! Try keeping it under 500 characters.");
+  }
+
+  try {
     await ctx.replyWithChatAction("typing");
 
     const categories = await getUserCategories(userId);
@@ -20,96 +63,87 @@ async function handleExpense(ctx: any, text: string) {
     const extracted = await extractExpense(text, categoryNames);
     const expense = ExpenseSchema.parse(extracted);
 
+    if (expense.amount <= 0) {
+      return ctx.reply("💰 Please provide a valid amount greater than 0.");
+    }
+
     const category = await findOrCreateCategory(expense.category, userId);
     await addExpense(expense, userId, category.id);
 
-    let response = `✅ *Expense Recorded!*\n\n`;
-    response += `💰 *Amount:* ₹${expense.amount}\n`;
+    let response = `✅ *Recorded successfully!*\n\n`;
+    response += `💰 *Amount:* ₹${expense.amount.toLocaleString()}\n`;
     response += `📁 *Category:* ${category.name}${expense.isNewCategory ? " (New)" : ""}\n`;
     if (expense.description) {
-      response += `📝 *Description:* ${expense.description}\n`;
+      response += `📝 *Note:* ${expense.description}\n`;
     }
 
     await ctx.reply(response, { parse_mode: "Markdown" });
   } catch (error: any) {
     console.error("Expense processing error:", error);
+    let msg = "❌ *Oops!* I couldn't process that.";
+    if (error.name === "ZodError") msg = "❌ *Error:* Invalid data format received from AI.";
     
-    let errorMessage = "❌ *Oops!* I encountered an error while processing that.";
-    const technical = error.message ? `\n\n_Error:_ \`${error.message.substring(0, 100)}\`` : "";
-
-    await ctx.reply(
-      `${errorMessage}${technical}\n\nTry: \`Spent 50 on snacks\` or \`100 - Petrol\``,
-      { parse_mode: "Markdown" }
-    );
+    await ctx.reply(`${msg}\n\n_Try:_ \`100 for Pizza\` or \`250 - Petrol\``, { parse_mode: "Markdown" });
   }
 }
 
 export default function getBot() {
   if (!bot) {
     const token = process.env.TELEGRAM_BOT_TOKEN;
-
-    if (!token) {
-      throw new Error("TELEGRAM_TOKEN is missing");
-    }
+    if (!token) throw new Error("TELEGRAM_TOKEN is missing");
 
     bot = new Bot(token);
 
-    // Register commands for the Telegram "Menu" button
     bot.api.setMyCommands([
-      { command: "start", description: "Start the bot" },
-      { command: "history", description: "Recent expenses & delete" },
-      { command: "stats", description: "Spending reports" },
-      { command: "add", description: "Add manually (e.g. /add 20 pen)" },
-      { command: "help", description: "Show help & examples" },
+      { command: "start", description: "🏠 Welcome & Setup" },
+      { command: "code", description: "🔑 Get Login Code" },
+      { command: "history", description: "📋 Recent Expenses" },
+      { command: "stats", description: "📊 Spending Reports" },
+      { command: "categories", description: "📁 My Categories" },
+      { command: "add", description: "➕ Add Manually" },
+      { command: "help", description: "❓ How to Use" },
+      { command: "clear", description: "⚠️ Reset Data" },
     ]);
 
     bot.command("start", (ctx: any) => {
-      let startMsg = `🚀 *Welcome to Kharch Bot!*\n\n`;
-      startMsg += `I'm your AI-powered financial assistant. Send me your expenses in any format, and I'll track them for you.\n\n`;
-      startMsg += `✨ *Try saying:* \`100 for lunch\`\n\n`;
-      startMsg += `Use /help to see all available commands.`;
-      ctx.reply(startMsg, { parse_mode: "Markdown" });
+      ctx.reply(
+        `🚀 *Welcome to Kharch AI!*\n\n` +
+        `I'm here to help you track your spending without the hassle. Just send me your expenses like you're talking to a friend.\n\n` +
+        `✨ *Example:* \`500 for dinner with Rahul\`\n\n` +
+        `Use /help to see all features.`,
+        { parse_mode: "Markdown" }
+      );
     });
 
-    bot.command("help", (ctx: any) => {
-      let helpMsg = `📖 *Kharch Bot Help*\n\n`;
-      helpMsg += `Track your expenses easily using AI! Just talk to me normally.\n\n`;
-      
-      helpMsg += `🖋 *Tracking Expenses*\n`;
-      helpMsg += `• Just type: \`20 for coffee\`\n`;
-      helpMsg += `• Or shorthand: \`Tea 10\`\n`;
-      helpMsg += `• Or command: \`/add 500 petrol\`\n\n`;
-      
-      helpMsg += `📋 *Management*\n`;
-      helpMsg += `• /history - View last 5 entries & delete them\n`;
-      helpMsg += `• /stats - Weekly & monthly summaries\n\n`;
-      
-      helpMsg += `💡 *Tip:* I can learn your categories! If you spend on something new, just say it and I'll remember.`;
+    bot.command("code", handleLoginCode);
 
-      ctx.reply(helpMsg, { parse_mode: "Markdown" });
+    bot.command("categories", async (ctx: any) => {
+      const userId = ctx.from?.id;
+      if (!userId) return;
+      const cats = await getUserCategories(userId);
+      if (cats.length === 0) return ctx.reply("📁 You haven't created any categories yet.");
+      
+      const list = cats.map((c: any) => `• ${c.name}`).join("\n");
+      ctx.reply(`📁 *Your Categories:*\n\n${list}`, { parse_mode: "Markdown" });
     });
 
     bot.command("history", async (ctx: any) => {
       const userId = ctx.from?.id;
       if (!userId) return;
 
-      const recent = await getRecentExpenses(userId, 5);
-      if (recent.length === 0) {
-        return ctx.reply("📭 You haven't added any expenses yet!");
-      }
+      const recent = await getRecentExpenses(userId, 10);
+      if (recent.length === 0) return ctx.reply("📭 No expenses found.");
 
-      let message = "📝 *Recent Expenses (Last 5)*\n\n";
+      let message = "📝 *Recent Expenses*\n\n";
       const keyboard = new InlineKeyboard();
 
       recent.forEach((exp: any, index: number) => {
-        message += `${index + 1}. *₹${exp.amount}* — ${exp.category_name}\n   _📅 ${new Date(exp.created_at).toLocaleDateString()}_\n\n`;
-        keyboard.text(`🗑 Delete ${index + 1}`, `delete_${exp.id}`).row();
+        message += `${index + 1}. *₹${exp.amount}* — ${exp.category_name}\n   _${exp.description || "No description"}_\n\n`;
+        keyboard.text(`🗑 Del ${index + 1}`, `delete_${exp.id}`);
+        if ((index + 1) % 2 === 0) keyboard.row();
       });
 
-      await ctx.reply(message, { 
-        parse_mode: "Markdown",
-        reply_markup: keyboard
-      });
+      await ctx.reply(message, { parse_mode: "Markdown", reply_markup: keyboard });
     });
 
     bot.command("stats", async (ctx: any) => {
@@ -117,59 +151,64 @@ export default function getBot() {
       if (!userId) return;
 
       await ctx.replyWithChatAction("typing");
-      const [weekStats, monthStats] = await Promise.all([
-        getStats(userId, "week"),
-        getStats(userId, "month")
-      ]);
+      const [w, m] = await Promise.all([getStats(userId, "week"), getStats(userId, "month")]);
 
-      let message = "📊 *Your Spending Summary*\n\n";
-      
-      message += "🗓 *Last 7 Days*\n";
-      if (weekStats.length === 0) {
-        message += "_No data available_\n";
-      } else {
-        weekStats.forEach((s: any) => message += `• ${s.category}: ₹${s.total}\n`);
-      }
+      let msg = "📊 *Spending Report*\n\n";
+      msg += "🗓 *Last 7 Days*\n" + (w.length ? w.map((s: any) => `• ${s.category}: ₹${s.total}`).join("\n") : "_No data_") + "\n\n";
+      msg += "🗓 *Last 30 Days*\n" + (m.length ? m.map((s: any) => `• ${s.category}: ₹${s.total}`).join("\n") : "_No data_");
 
-      message += "\n🗓 *Last 30 Days*\n";
-      if (monthStats.length === 0) {
-        message += "_No data available_\n";
-      } else {
-        monthStats.forEach((s: any) => message += `• ${s.category}: ₹${s.total}\n`);
-      }
-
-      await ctx.reply(message, { parse_mode: "Markdown" });
+      await ctx.reply(msg, { parse_mode: "Markdown" });
     });
 
-    bot.command("add", async (ctx: any) => {
+    bot.command("clear", (ctx: any) => {
+      const keyboard = new InlineKeyboard()
+        .text("❌ Cancel", "cancel_clear")
+        .text("✅ Confirm Reset", "confirm_clear");
+      ctx.reply("⚠️ *Danger Zone*\n\nThis will permanently delete all your expense data. Are you sure?", {
+        parse_mode: "Markdown",
+        reply_markup: keyboard
+      });
+    });
+
+    bot.command("add", (ctx: any) => {
       const text = ctx.message?.text?.replace("/add", "").trim();
-      if (!text) {
-        return ctx.reply("❓ *How to use:* \`/add 20 on pen\`");
-      }
-      await handleExpense(ctx, text);
+      if (!text) return ctx.reply("❓ *Usage:* \`/add 50 for Tea\`");
+      handleExpense(ctx, text);
+    });
+
+    bot.command("help", (ctx: any) => {
+      ctx.reply(
+        `📖 *Kharch AI Guide*\n\n` +
+        `• *Natural Language:* Just type \`100 for snacks\`\n` +
+        `• *Shorthand:* \`Petrol 500\` or \`200 - Lunch\`\n` +
+        `• *Dashboard:* Use /code to log into the web UI\n` +
+        `• *Management:* Use /history to delete entries\n\n` +
+        `I'll automatically categorize your spending!`,
+        { parse_mode: "Markdown" }
+      );
     });
 
     bot.on("callback_query:data", async (ctx: any) => {
       const data = ctx.callbackQuery.data;
-      if (data?.startsWith("delete_")) {
-        const id = parseInt(data.replace("delete_", ""));
-        const userId = ctx.from?.id;
-        if (!userId) return;
+      const userId = ctx.from?.id;
+      if (!userId) return;
 
-        const success = await deleteExpense(id, userId);
-        if (success) {
-          await ctx.answerCallbackQuery("✅ Deleted!");
-          await ctx.editMessageText("🗑 *Expense has been removed from your history.*", { parse_mode: "Markdown" });
-        } else {
-          await ctx.answerCallbackQuery("❌ Failed to delete.");
+      if (data.startsWith("delete_")) {
+        const id = parseInt(data.replace("delete_", ""));
+        if (await deleteExpense(id, userId)) {
+          await ctx.answerCallbackQuery("✅ Deleted");
+          await ctx.editMessageText("🗑 *Entry removed.*", { parse_mode: "Markdown" });
         }
+      } else if (data === "confirm_clear") {
+        await pool.query("DELETE FROM expenses WHERE user_id = $1", [userId]);
+        await pool.query("DELETE FROM categories WHERE user_id = $1", [userId]);
+        await ctx.editMessageText("💥 *All data has been wiped clean.*", { parse_mode: "Markdown" });
+      } else if (data === "cancel_clear") {
+        await ctx.editMessageText("Whew! Action cancelled. 😅", { parse_mode: "Markdown" });
       }
     });
 
-    bot.on("message:text", async (ctx: any) => {
-      await handleExpense(ctx, ctx.message.text);
-    });
+    bot.on("message:text", (ctx: any) => handleExpense(ctx, ctx.message.text));
   }
-
   return bot;
 }

@@ -32,8 +32,20 @@ async function initDb() {
       );
     `;
 
+    console.log("Creating auth_codes table...");
+
+    await sql`
+      CREATE TABLE IF NOT EXISTS auth_codes (
+        id SERIAL PRIMARY KEY,
+        user_id BIGINT NOT NULL,
+        code VARCHAR(6) NOT NULL,
+        expires_at TIMESTAMP WITH TIME ZONE NOT NULL,
+        created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+      );
+    `;
 
     console.log("✅ Database initialized successfully!");
+
   } catch (error) {
     console.error("❌ Database initialization failed:", error);
   } finally {
