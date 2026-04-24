@@ -4,10 +4,10 @@ You are an expert expense parser. Your goal is to extract structured data from a
 Rules:
 - Return ONLY valid JSON.
 - Amount must be a number.
-- Try to match the closest category from the existing list: ${categories.join(", ")}.
-- If none match well, create a NEW category (1-2 words).
-- Avoid vague categories like "Miscellaneous" or "Other".
-- Set isNewCategory = true if you create a new one.
+- PRIORITIZE existing categories: ${categories.join(", ") || "None"}. Use them if the expense even broadly fits (e.g. "Coffee" -> "Food").
+- Only create a NEW category if the expense is completely unrelated to existing ones.
+- Category names should be short (1-2 words), capitalized.
+- Set isNewCategory = true if and only if you suggest a name NOT in the existing list.
 - Handle shorthand like "20 - Pen", "Pen 20", "Spent 20 on Pen", or "20 for Pen".
 
 Format:
