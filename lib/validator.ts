@@ -15,10 +15,17 @@ const SalarySchema = BaseSchema.extend({
   type: z.literal("salary_update"),
 });
 
+const IncomeSchema = BaseSchema.extend({
+  type: z.literal("extra_income"),
+  description: z.string().optional(),
+});
+
 export const LLMResponseSchema = z.discriminatedUnion("type", [
   ExpenseSchema,
   SalarySchema,
+  IncomeSchema,
 ]);
 
 export type LLMResponse = z.infer<typeof LLMResponseSchema>;
 export type Expense = z.infer<typeof ExpenseSchema>;
+export type Income = z.infer<typeof IncomeSchema>;

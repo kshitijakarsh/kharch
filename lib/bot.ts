@@ -3,6 +3,7 @@ import { extractExpense } from "./llm";
 import { getUserCategories, findOrCreateCategory } from "./categories";
 import { addExpense, getRecentExpenses, deleteExpense, getStats } from "./expenses";
 import { updateUserSalary, getUserSalary } from "./users";
+import { addIncome, getMonthlyExtraIncome } from "./incomes";
 import { pool } from "./db";
 import { LLMResponseSchema } from "./validator";
 
@@ -74,6 +75,17 @@ async function handleIncomingMessage(ctx: any, text: string) {
       );
     }
 
+    if (result.type === "extra_income") {
+      await addIncome(result, userId);
+      return ctx.reply(
+        `✅ *Income Recorded!*\n\n` +
+        `💰 *Amount:* ₹${result.amount.toLocaleString()}\n` +
+        `📝 *Note:* ${result.description || "Extra money"}\n\n` +
+        `This has been added to your monthly totals.`,
+        { parse_mode: "Markdown" }
+      );
+    }
+
     // Expense processing
     const category = await findOrCreateCategory(result.category, userId);
     await addExpense({
@@ -114,6 +126,7 @@ export default function getBot() {
     bot.api.setMyCommands([
       { command: "start", description: "🏠 Welcome & Onboarding" },
       { command: "salary", description: "💰 Set Monthly Income" },
+      { command: "income", description: "💵 Record Extra Money" },
       { command: "code", description: "🔑 Get Web Login Code" },
       { command: "history", description: "📋 Recent Expenses" },
       { command: "stats", description: "📊 Spending Reports" },
@@ -186,6 +199,18 @@ export default function getBot() {
       handleIncomingMessage(ctx, text);
     });
 
+    bot.command("income", async (ctx: any) => {
+      const userId = ctx.from?.id;
+      if (!userId) return;
+      const extra = await getMonthlyExtraIncome(userId);
+      ctx.reply(
+        `💵 *Extra Income (This Month)*\n\n` +
+        `Total: *₹${extra.toLocaleString()}*\n\n` +
+        `To record more, just tell me: \`Received 2000 from friend\` or \`Got 5k bonus\``,
+        { parse_mode: "Markdown" }
+      );
+    });
+
     bot.command("code", handleLoginCode);
 
     bot.command("categories", async (ctx: any) => {
@@ -222,18 +247,22 @@ export default function getBot() {
       if (!userId) return;
 
       await ctx.replyWithChatAction("typing");
-      const [w, m, salary] = await Promise.all([
+      const [w, m, salary, extraIncome] = await Promise.all([
         getStats(userId, "week"), 
         getStats(userId, "month"),
-        getUserSalary(userId)
+        getUserSalary(userId),
+        getMonthlyExtraIncome(userId)
       ]);
 
       const totalMonth = m.reduce((a: number, c: any) => a + parseFloat(c.total), 0);
+      const totalIncome = salary + extraIncome;
 
       let msg = "📊 *Financial Overview*\n\n";
-      if (salary > 0) {
-        const burn = (totalMonth / salary) * 100;
-        msg += `💰 *Salary:* ₹${salary.toLocaleString()}\n`;
+      if (totalIncome > 0) {
+        const burn = (totalMonth / totalIncome) * 100;
+        msg += `💰 *Monthly Salary:* ₹${salary.toLocaleString()}\n`;
+        msg += `➕ *Extra Income:* ₹${extraIncome.toLocaleString()}\n`;
+        msg += `🏦 *Total Capital:* ₹${totalIncome.toLocaleString()}\n`;
         msg += `🔥 *Burn Rate:* ${burn.toFixed(1)}%\n\n`;
       }
       

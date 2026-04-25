@@ -54,6 +54,17 @@ async function initDb() {
       );
     `;
 
+    console.log("Creating incomes table...");
+    await sql`
+      CREATE TABLE IF NOT EXISTS incomes (
+        id SERIAL PRIMARY KEY,
+        amount DECIMAL(12, 2) NOT NULL,
+        description TEXT,
+        user_id BIGINT NOT NULL,
+        created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+      );
+    `;
+
     console.log("✅ Database initialized successfully!");
 
   } catch (error) {
