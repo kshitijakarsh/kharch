@@ -64,3 +64,27 @@ export const getDailyStats = async (userId: number) => {
   );
   return res.rows;
 };
+
+/** Get total spending for a specific category within a date range */
+export const getCustomStats = async (
+  userId: number,
+  category: string | null,
+  startDate: string,
+  endDate: string
+) => {
+  let query = `
+    SELECT SUM(e.amount) as total
+    FROM expenses e
+    JOIN categories c ON e.category_id = c.id
+    WHERE e.user_id = $1 AND e.created_at >= $2 AND e.created_at <= $3
+  `;
+  const params: any[] = [userId, startDate, endDate];
+
+  if (category) {
+    query += " AND c.name = $4";
+    params.push(category.toLowerCase());
+  }
+
+  const res = await pool.query(query, params);
+  return res.rows[0].total || 0;
+};

@@ -20,12 +20,21 @@ const IncomeSchema = BaseSchema.extend({
   description: z.string().optional(),
 });
 
+const QuerySchema = z.object({
+  type: z.literal("query"),
+  category: z.string().nullable(),
+  start_date: z.string(),
+  end_date: z.string(),
+});
+
 export const LLMResponseSchema = z.discriminatedUnion("type", [
   ExpenseSchema,
   SalarySchema,
   IncomeSchema,
+  QuerySchema,
 ]);
 
 export type LLMResponse = z.infer<typeof LLMResponseSchema>;
 export type Expense = z.infer<typeof ExpenseSchema>;
 export type Income = z.infer<typeof IncomeSchema>;
+export type Query = z.infer<typeof QuerySchema>;

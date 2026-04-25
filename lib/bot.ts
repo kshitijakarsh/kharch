@@ -1,10 +1,12 @@
 import { Bot, InlineKeyboard } from "grammy";
 import { getUserCategories, findOrCreateCategory } from "./categories";
-import { addExpense, getRecentExpenses, deleteExpense, getStats } from "./expenses";
+import { addExpense, getRecentExpenses, deleteExpense, getStats, getCustomStats } from "./expenses";
 import { updateUserSalary, getUserSalary } from "./users";
 import { addIncome, getMonthlyExtraIncome } from "./incomes";
 import { pool } from "./db";
 import { parseManualCommand } from "./parser";
+import { processAIRequest } from "./llm";
+import { LLMResponseSchema } from "./validator";
 
 let bot: Bot | null = null;
 
@@ -46,7 +48,77 @@ async function handleLoginCode(ctx: any) {
   }
 }
 
+// --- Handler: Process Message (AI) ---
+async function handleIncomingMessage(ctx: any, text: string) {
+  const userId = ctx.from?.id;
+  if (!userId || !text.trim()) return;
+
+  try {
+    await ctx.replyWithChatAction("typing");
+
+    const categories = await getUserCategories(userId);
+    const categoryNames = categories.map((c: any) => c.name);
+
+    const extracted = await processAIRequest(text, categoryNames);
+    const result = LLMResponseSchema.parse(extracted);
+
+    if (result.type === "query") {
+      const total = await getCustomStats(userId, result.category, result.start_date, result.end_date);
+      const catMsg = result.category ? ` on *${result.category}*` : "";
+      return ctx.reply(
+        `📊 *Spending Report*\n\n` +
+        `You spent a total of *₹${total.toLocaleString()}*${catMsg} between ${result.start_date} and ${result.end_date}.`,
+        { parse_mode: "Markdown" }
+      );
+    }
+
+    if (result.type === "salary_update") {
+      await updateUserSalary(userId, result.amount);
+      return ctx.reply(
+        `✅ *Salary Updated!*\n\n` +
+        `Your monthly income is now set to *₹${result.amount.toLocaleString()}*.`,
+        { parse_mode: "Markdown" }
+      );
+    }
+
+    if (result.type === "extra_income") {
+      await addIncome(result, userId);
+      return ctx.reply(
+        `✅ *Income Recorded!*\n\n` +
+        `💰 *Amount:* ₹${result.amount.toLocaleString()}\n` +
+        `📝 *Note:* ${result.description || "Extra money"}`,
+        { parse_mode: "Markdown" }
+      );
+    }
+
+    // Expense processing
+    const category = await findOrCreateCategory(result.category, userId);
+    await addExpense({
+      ...result,
+      category: category.name,
+      isNewCategory: false
+    } as any, userId, category.id);
+
+    let response = `✅ *Recorded!*\n\n`;
+    response += `💰 *Amount:* ₹${result.amount.toLocaleString()}\n`;
+    response += `📁 *Category:* ${category.name}\n`;
+    if (result.description) {
+      response += `📝 *Note:* ${result.description}\n`;
+    }
+
+    await ctx.reply(response, { parse_mode: "Markdown" });
+  } catch (error: any) {
+    console.error("Processing error:", error);
+    await ctx.reply(
+      "❌ *Oops!* I couldn't process that.\n\n" +
+      "_Try:_ \`100 for Coffee\` or \`How much did I spend this week?\`",
+      { parse_mode: "Markdown" }
+    );
+  }
+}
+
 export default function getBot() {
+// ... existing getBot implementation ...
   if (!bot) {
     const token = process.env.TELEGRAM_BOT_TOKEN;
     if (!token) throw new Error("TELEGRAM_TOKEN is missing");
@@ -282,7 +354,7 @@ export default function getBot() {
     bot.on("message:text", (ctx: any) => {
       const text = ctx.message.text;
       if (text.startsWith("/")) return; 
-      ctx.reply("💡 *To record an expense, use the /add command.*\n\n_Example:_ \`/add 150 food snacks\`", { parse_mode: "Markdown" });
+      handleIncomingMessage(ctx, text);
     });
 
   }

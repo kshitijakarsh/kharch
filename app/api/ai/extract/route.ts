@@ -1,9 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getUserCategories, findOrCreateCategory } from "@/lib/categories";
-import { addExpense } from "@/lib/expenses";
+import { addExpense, getCustomStats } from "@/lib/expenses";
 import { updateUserSalary } from "@/lib/users";
 import { cookies } from "next/headers";
-import { parseManualCommand } from "@/lib/parser";
+import { processAIRequest } from "@/lib/llm";
+import { LLMResponseSchema } from "@/lib/validator";
 
 export async function POST(request: NextRequest) {
   try {
@@ -15,30 +16,38 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const parsed = parseManualCommand(text);
+    const categories = await getUserCategories(parseInt(userId));
+    const categoryNames = categories.map((c: any) => c.name);
+
+    const extracted = await processAIRequest(text, categoryNames);
+    const result = LLMResponseSchema.parse(extracted);
     
-    if (!parsed) {
-      return NextResponse.json({ error: "Invalid command format. Use /add <amount> <category> [note]" }, { status: 400 });
+    if (result.type === 'query') {
+      const total = await getCustomStats(parseInt(userId), result.category, result.start_date, result.end_date);
+      const catMsg = result.category ? ` on ${result.category}` : "";
+      return NextResponse.json({
+        success: true,
+        type: 'query',
+        message: `You spent a total of ₹${total.toLocaleString()}${catMsg} between ${result.start_date} and ${result.end_date}.`
+      });
     }
 
-    if (parsed.type === 'salary_update') {
-      await updateUserSalary(parseInt(userId), parsed.amount);
+    if (result.type === 'salary_update') {
+      await updateUserSalary(parseInt(userId), result.amount);
       return NextResponse.json({ 
         success: true, 
         type: 'salary_update',
-        amount: parsed.amount,
-        message: `Salary updated to ₹${parsed.amount.toLocaleString()}`
+        amount: result.amount,
+        message: `Salary updated to ₹${result.amount.toLocaleString()}`
       });
     }
 
     // Expense logic
-    if (parsed.type === 'expense') {
-      const category = await findOrCreateCategory(parsed.category!, parseInt(userId));
+    if (result.type === 'expense') {
+      const category = await findOrCreateCategory(result.category, parseInt(userId));
       await addExpense({
-        type: 'expense',
-        amount: parsed.amount,
+        ...result,
         category: category.name,
-        description: parsed.description,
         isNewCategory: false
       }, parseInt(userId), category.id);
 
@@ -46,9 +55,9 @@ export async function POST(request: NextRequest) {
         success: true, 
         type: 'expense',
         expense: {
-          amount: parsed.amount,
+          amount: result.amount,
           category: category.name,
-          description: parsed.description
+          description: result.description
         }
       });
     }

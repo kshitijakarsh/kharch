@@ -23,7 +23,7 @@ interface Message {
 export default function Home() {
   const [isLoggedIn, setIsLoggedIn] = useState<boolean | null>(null);
   const [messages, setMessages] = useState<Message[]>([
-    { role: 'assistant', content: 'Hello! I am your Kharch Assistant. Use commands like /add 100 food coffee to record your spending.' },
+    { role: 'assistant', content: 'Hello! I am your Kharch AI. Just type your expense or ask me a question like "How much did I spend this week?"' },
   ]);
   const [expenses, setExpenses] = useState<any[]>([]);
   const [stats,    setStats]    = useState<any>({ week: [], month: [], daily: [], salary: 0 });
@@ -97,7 +97,7 @@ export default function Home() {
         setMessages(prev => [...prev, { role: 'assistant', content: reply }]);
         fetchData();
       } else {
-        setMessages(prev => [...prev, { role: 'assistant', content: "Invalid command. Try: /add 150 food snacks" }]);
+        setMessages(prev => [...prev, { role: 'assistant', content: "I couldn't process that. Try again?" }]);
       }
     } catch {
       setMessages(prev => [...prev, { role: 'assistant', content: 'Connection lost. Please try again.' }]);
@@ -136,7 +136,7 @@ export default function Home() {
           Financial clarity, <br /> recorded with poise.
         </h1>
         <p className="text-xl text-zinc-400 max-w-2xl mx-auto leading-relaxed mb-16">
-          A minimalist financial journal driven by simple commands. Private, structured, and entirely controlled by you.
+          An AI-powered financial journal that understands your context. Minimalist, private, and structured entirely by you.
         </p>
 
         {/* Login card */}
@@ -176,7 +176,7 @@ export default function Home() {
       {/* Features */}
       <section className="grid grid-cols-1 md:grid-cols-3 gap-16 px-8 lg:px-16 py-32 border-t border-zinc-800">
         {[
-          { title: 'Command Driven',   desc: 'Record expenses instantly with simple shortcuts like /add. No complex forms needed.' },
+          { title: 'Natural Recording',  desc: 'Speak or type. Our AI parses categories and amounts with zero effort from your end.' },
           { title: 'Editorial Reports',  desc: 'No loud charts. Just clean, bordered visualisations that tell a story about your capital.' },
           { title: 'Absolute Privacy',   desc: 'Code-only login and isolated data ensures your finances remain yours alone.' },
         ].map((f, i) => (
@@ -300,8 +300,8 @@ export default function Home() {
                   <Bot size={16} />
                 </div>
                 <div>
-                  <h2 className="text-sm font-bold text-zinc-100">Kharch Assistant</h2>
-                  <p className="text-[10px] text-zinc-500 font-bold uppercase tracking-widest">Command Based</p>
+                  <h2 className="text-sm font-bold text-zinc-100">Kharch AI Assistant</h2>
+                  <p className="text-[10px] text-zinc-500 font-bold uppercase tracking-widest">Always Learning</p>
                 </div>
               </div>
               <button
@@ -338,7 +338,7 @@ export default function Home() {
           ) : (
             <div className="flex flex-1 items-center justify-between">
               <span className="text-sm text-zinc-500">
-                Type /add to record an expense…
+                Ask anything about your expenses…
               </span>
               <div className="flex items-center gap-2">
                 <span className="text-[10px] font-bold text-zinc-600 uppercase tracking-widest border border-zinc-800 bg-zinc-900 px-2 py-1 rounded-md">
