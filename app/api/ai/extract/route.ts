@@ -1,9 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
-import { extractExpense } from "@/lib/llm";
 import { getUserCategories, findOrCreateCategory } from "@/lib/categories";
 import { addExpense } from "@/lib/expenses";
 import { updateUserSalary } from "@/lib/users";
 import { cookies } from "next/headers";
+import { parseManualCommand } from "@/lib/parser";
 
 export async function POST(request: NextRequest) {
   try {
@@ -15,35 +15,48 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const categories = await getUserCategories(parseInt(userId));
-    const categoryNames = categories.map((c: any) => c.name);
-
-    const extracted = await extractExpense(text, categoryNames);
+    const parsed = parseManualCommand(text);
     
-    if (extracted.type === 'salary_update') {
-      await updateUserSalary(parseInt(userId), extracted.amount);
+    if (!parsed) {
+      return NextResponse.json({ error: "Invalid command format. Use /add <amount> <category> [note]" }, { status: 400 });
+    }
+
+    if (parsed.type === 'salary_update') {
+      await updateUserSalary(parseInt(userId), parsed.amount);
       return NextResponse.json({ 
         success: true, 
         type: 'salary_update',
-        amount: extracted.amount,
-        message: `Salary updated to ₹${extracted.amount.toLocaleString()}`
+        amount: parsed.amount,
+        message: `Salary updated to ₹${parsed.amount.toLocaleString()}`
       });
     }
 
     // Expense logic
-    const category = await findOrCreateCategory(extracted.category, parseInt(userId));
-    await addExpense(extracted, parseInt(userId), category.id);
+    if (parsed.type === 'expense') {
+      const category = await findOrCreateCategory(parsed.category!, parseInt(userId));
+      await addExpense({
+        type: 'expense',
+        amount: parsed.amount,
+        category: category.name,
+        description: parsed.description,
+        isNewCategory: false
+      }, parseInt(userId), category.id);
 
-    return NextResponse.json({ 
-      success: true, 
-      type: 'expense',
-      expense: {
-        ...extracted,
-        category: category.name
-      }
-    });
+      return NextResponse.json({ 
+        success: true, 
+        type: 'expense',
+        expense: {
+          amount: parsed.amount,
+          category: category.name,
+          description: parsed.description
+        }
+      });
+    }
+
+    return NextResponse.json({ error: "Unsupported command type" }, { status: 400 });
+
   } catch (error) {
-    console.error("AI Extraction Error:", error);
-    return NextResponse.json({ error: "Failed to parse input" }, { status: 500 });
+    console.error("Command Processing Error:", error);
+    return NextResponse.json({ error: "Failed to process command" }, { status: 500 });
   }
 }
