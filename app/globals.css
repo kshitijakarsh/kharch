@@ -1,4 +1,3 @@
-@import url('https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,200..800&family=Instrument+Serif:ital,wght@0,400;1,400&display=swap');
 @import "tailwindcss";
 
 /* ── Design tokens (Tailwind v4 @theme) ───────────────────────────────────── */
@@ -13,8 +12,8 @@
   --color-muted-foreground: #71717a;
 
   /* Typography */
-  --font-sans:  'Bricolage Grotesque', sans-serif;
-  --font-serif: 'Instrument Serif', serif;
+  --font-sans: var(--font-bricolage);
+  --font-instrument: var(--font-instrument);
 
   /* Radii */
   --radius-xl:  0.75rem;
