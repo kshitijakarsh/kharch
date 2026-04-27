@@ -53,6 +53,11 @@ export default function HomePage() {
             const res = await fetch('/api/dashboard');
             const data = await res.json();
             
+            if (res.status === 401) {
+                window.location.href = '/login';
+                return;
+            }
+
             if (data.stats) setStats(data.stats);
             if (data.expenses) setExpenses(data.expenses);
             if (data.user) setUser(data.user);
@@ -108,7 +113,7 @@ export default function HomePage() {
 
     const handleLogout = async () => {
         await fetch('/api/auth/logout', { method: 'POST' });
-        window.location.reload();
+        window.location.href = '/login';
     };
 
     const totalSpent = (stats.month || []).reduce((a: number, c: any) => a + parseFloat(c.total || 0), 0);

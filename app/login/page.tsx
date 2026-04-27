@@ -1,15 +1,71 @@
 "use client";
 
-import { Copy } from "lucide-react";
+import { useState, useRef, useEffect } from "react";
+import { Copy, Loader2 } from "lucide-react";
 import Image from "next/image";
 import { toast } from "react-toastify";
 
 export default function V2LandingPage() {
+    const [otp, setOtp] = useState(["", "", "", "", "", ""]);
+    const [isLoading, setIsLoading] = useState(false);
+    const inputRefs = useRef<(HTMLInputElement | null)[]>([]);
+
+    useEffect(() => {
+        inputRefs.current[0]?.focus();
+    }, []);
 
     const handleCopy = () => {
         navigator.clipboard.writeText("/code");
         toast.success("Copied to clipboard");
     }
+
+    const handleOtpChange = (index: number, value: string) => {
+        if (!/^\d*$/.test(value)) return;
+        
+        const newOtp = [...otp];
+        newOtp[index] = value.slice(-1);
+        setOtp(newOtp);
+
+        if (value && index < 5) {
+            inputRefs.current[index + 1]?.focus();
+        }
+    };
+
+    const handleKeyDown = (index: number, e: React.KeyboardEvent<HTMLInputElement>) => {
+        if (e.key === "Backspace" && !otp[index] && index > 0) {
+            inputRefs.current[index - 1]?.focus();
+        } else if (e.key === "Enter" && otp.join("").length === 6) {
+            handleLogin();
+        }
+    };
+
+    const handleLogin = async () => {
+        const code = otp.join("");
+        if (code.length < 6) {
+            toast.error("Please enter the 6-digit code");
+            return;
+        }
+
+        setIsLoading(true);
+        try {
+            const res = await fetch("/api/auth/verify", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ code }),
+            });
+            const data = await res.json();
+            if (data.success) {
+                toast.success("Welcome back!");
+                window.location.href = "/";
+            } else {
+                toast.error(data.error || "Invalid code");
+            }
+        } catch (error) {
+            toast.error("Something went wrong");
+        } finally {
+            setIsLoading(false);
+        }
+    };
 
     return (
         <div className="w-screen h-screen overflow-hidden grid grid-cols-2 bg-black">
@@ -29,22 +85,30 @@ export default function V2LandingPage() {
                     <p className="font-sans text-xl text-white/50 tracking-tighter mt-1 selection:text-black selection:bg-white">Financial clarity, recorded with poise.</p>
 
                     <div className="flex mt-12 gap-3">
-                        {Array.from({ length: 6 }).map((_, index) => (
+                        {otp.map((value, index) => (
                             <div key={index} className="relative bg-white h-[60px] w-[50px] rounded-lg ring ring-white/5 ring-offset-2 ring-offset-black overflow-hidden transition-all focus-within:ring-white/30">
                                 <div className="absolute inset-0.5 border border-dashed border-black/10 rounded-[inherit] pointer-events-none"></div>
                                 <input
+                                    ref={(el) => { inputRefs.current[index] = el; }}
                                     type="text"
+                                    inputMode="numeric"
+                                    autoComplete="one-time-code"
                                     maxLength={1}
+                                    value={value}
+                                    onChange={(e) => handleOtpChange(index, e.target.value)}
+                                    onKeyDown={(e) => handleKeyDown(index, e)}
                                     className="w-full h-full bg-transparent text-center text-xl font-bold text-black outline-none"
                                 />
                             </div>
                         ))}
                     </div>
 
-                    {/* https://sqkhor.medium.com/create-an-otp-input-with-javascript-c0c9f7c610fe read and implement this */}
-
-                    <button className="bg-white w-[110px] h-[44px] mt-6 rounded-lg flex items-center justify-center text-black font-semibold text-sm hover:bg-neutral-200 transition-all active:scale-95">
-                        Let's go
+                    <button 
+                        onClick={handleLogin}
+                        disabled={isLoading}
+                        className="bg-white w-[110px] h-[44px] mt-6 rounded-lg flex items-center justify-center text-black font-semibold text-sm hover:bg-neutral-200 transition-all active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                        {isLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : "Let's go"}
                     </button>
 
                     <div className="flex flex-col gap-2 mt-12">
