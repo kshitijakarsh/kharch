@@ -6,10 +6,14 @@ export const addExpense = async (
   userId: number,
   categoryId: number
 ) => {
-  const res = await pool.query(
-    "INSERT INTO expenses (amount, description, category_id, user_id) VALUES ($1, $2, $3, $4) RETURNING *",
-    [expense.amount, expense.description || "", categoryId, userId]
-  );
+  const query = expense.date 
+    ? "INSERT INTO expenses (amount, description, category_id, user_id, created_at) VALUES ($1, $2, $3, $4, $5) RETURNING *"
+    : "INSERT INTO expenses (amount, description, category_id, user_id) VALUES ($1, $2, $3, $4) RETURNING *";
+  
+  const params = [expense.amount, expense.description || "", categoryId, userId];
+  if (expense.date) params.push(expense.date);
+
+  const res = await pool.query(query, params);
   return res.rows[0];
 };
 

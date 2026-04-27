@@ -13,14 +13,14 @@ export function ChatMessage({ role, content, data }: ChatMessageProps) {
 
   return (
     <div className={cn(
-      "flex w-full gap-4 p-5 rounded-2xl border transition-colors",
+      "flex w-full gap-4 p-4 rounded-2xl border transition-colors",
       isAssistant
         ? "bg-white dark:bg-zinc-900 border-zinc-200 dark:border-zinc-800"
         : "bg-white dark:bg-zinc-950 border-zinc-100 dark:border-zinc-900"
     )}>
       {/* Avatar */}
       <div className={cn(
-        "flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border",
+        "flex h-6 w-6 shrink-0 items-center justify-center rounded-lg border",
         isAssistant
           ? "bg-zinc-900 dark:bg-zinc-100 border-zinc-900 dark:border-zinc-100 text-white dark:text-zinc-900"
           : "bg-white dark:bg-zinc-900 border-zinc-200 dark:border-zinc-700 text-zinc-500 dark:text-zinc-400"
@@ -34,7 +34,7 @@ export function ChatMessage({ role, content, data }: ChatMessageProps) {
           {content}
         </p>
         {data && (
-          <div className="mt-3 overflow-hidden rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-950 p-4">
+          <div className="mt-3 overflow-hidden rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-950">
             <div className="flex items-center gap-2 mb-2">
               <div className="h-1 w-1 rounded-full bg-zinc-300 dark:bg-zinc-600" />
               <span className="text-[10px] font-bold uppercase text-zinc-400 tracking-widest">Metadata</span>

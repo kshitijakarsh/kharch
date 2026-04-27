@@ -16,9 +16,6 @@ async function setup() {
 
   try {
     const me = await bot.api.getMe();
-    console.log(`🤖 Bot connected: @${me.username}`);
-
-    console.log("Setting commands...");
     await bot.api.setMyCommands([
       { command: "start", description: "Start the bot" },
       { command: "history", description: "Recent expenses & delete" },
@@ -26,10 +23,6 @@ async function setup() {
       { command: "add", description: "Add manually (e.g. /add 20 pen)" },
       { command: "help", description: "Show help & examples" },
     ]);
-    
-    console.log("✅ Commands registered successfully!");
-    console.log("\n💡 Note: It may take a few minutes for the 'Menu' button to update in your Telegram app.");
-    console.log("💡 Try restarting the Telegram app if the commands don't appear immediately.");
   } catch (error) {
     console.error("❌ Setup failed:", error);
   }

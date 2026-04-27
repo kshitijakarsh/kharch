@@ -42,23 +42,40 @@ export async function POST(request: NextRequest) {
       });
     }
 
-    // Expense logic
     if (result.type === 'expense') {
       const category = await findOrCreateCategory(result.category, parseInt(userId));
       await addExpense({
         ...result,
+        amount: result.amount || 0,
         category: category.name,
+        date: result.date,
         isNewCategory: false
       }, parseInt(userId), category.id);
+
+      let message = `Recorded ₹${(result.amount || 0).toLocaleString()} for ${category.name}.`;
+      if (result.date) {
+        const formattedDate = new Date(result.date).toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+        message = `Recorded ₹${(result.amount || 0).toLocaleString()} for ${category.name} on ${formattedDate}.`;
+      }
 
       return NextResponse.json({ 
         success: true, 
         type: 'expense',
+        message,
         expense: {
-          amount: result.amount,
+          amount: result.amount || 0,
           category: category.name,
-          description: result.description
+          description: result.description,
+          date: result.date
         }
+      });
+    }
+
+    if (result.type === 'unsupported') {
+      return NextResponse.json({
+        success: true,
+        type: 'unsupported',
+        message: result.message || "I'm not sure how to handle that. Try recording an expense!"
       });
     }
 

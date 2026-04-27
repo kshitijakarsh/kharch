@@ -8,6 +8,7 @@ const ExpenseSchema = BaseSchema.extend({
   type: z.literal("expense"),
   category: z.string().min(1),
   description: z.string().optional(),
+  date: z.string().optional(),
   isNewCategory: z.boolean(),
 });
 
@@ -27,11 +28,17 @@ const QuerySchema = z.object({
   end_date: z.string(),
 });
 
+const UnsupportedSchema = z.object({
+  type: z.literal("unsupported"),
+  message: z.string().optional(),
+});
+
 export const LLMResponseSchema = z.discriminatedUnion("type", [
-  ExpenseSchema,
+  ExpenseSchema.extend({ amount: z.number().optional() }), // In case AI misses it
   SalarySchema,
   IncomeSchema,
   QuerySchema,
+  UnsupportedSchema,
 ]);
 
 export type LLMResponse = z.infer<typeof LLMResponseSchema>;

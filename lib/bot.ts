@@ -1,4 +1,4 @@
-import { Bot, InlineKeyboard } from "grammy";
+import { Bot, InlineKeyboard, Context } from "grammy";
 import { getUserCategories, findOrCreateCategory } from "./categories";
 import { addExpense, getRecentExpenses, deleteExpense, getStats, getCustomStats } from "./expenses";
 import { updateUserSalary, getUserSalary } from "./users";
@@ -20,7 +20,7 @@ async function cleanupCodes() {
 }
 
 // --- Handler: Generate Login Code ---
-async function handleLoginCode(ctx: any) {
+async function handleLoginCode(ctx: Context) {
   const userId = ctx.from?.id;
   if (!userId) return;
 
@@ -49,7 +49,7 @@ async function handleLoginCode(ctx: any) {
 }
 
 // --- Handler: Process Message (AI) ---
-async function handleIncomingMessage(ctx: any, text: string) {
+async function handleIncomingMessage(ctx: Context, text: string) {
   const userId = ctx.from?.id;
   if (!userId || !text.trim()) return;
 
@@ -91,22 +91,35 @@ async function handleIncomingMessage(ctx: any, text: string) {
       );
     }
 
-    // Expense processing
-    const category = await findOrCreateCategory(result.category, userId);
-    await addExpense({
-      ...result,
-      category: category.name,
-      isNewCategory: false
-    } as any, userId, category.id);
-
-    let response = `✅ *Recorded!*\n\n`;
-    response += `💰 *Amount:* ₹${result.amount.toLocaleString()}\n`;
-    response += `📁 *Category:* ${category.name}\n`;
-    if (result.description) {
-      response += `📝 *Note:* ${result.description}\n`;
+    if (result.type === "unsupported") {
+      return ctx.reply(
+        result.message || "❌ *Oops!* I couldn't process that.\n\n_Try:_ `100 for Coffee` or `How much did I spend this week?`",
+        { parse_mode: "Markdown" }
+      );
     }
 
-    await ctx.reply(response, { parse_mode: "Markdown" });
+    if (result.type === "expense") {
+        if (!result.amount || !result.category) {
+            return ctx.reply("❌ I couldn't find the amount or category. Try again!");
+        }
+
+        const category = await findOrCreateCategory(result.category, userId);
+        await addExpense({
+          ...result,
+          amount: result.amount,
+          category: category.name,
+          isNewCategory: false
+        } as any, userId, category.id);
+
+        let response = `✅ *Recorded!*\n\n`;
+        response += `💰 *Amount:* ₹${result.amount.toLocaleString()}\n`;
+        response += `📁 *Category:* ${category.name}\n`;
+        if (result.description) {
+          response += `📝 *Note:* ${result.description}\n`;
+        }
+
+        return ctx.reply(response, { parse_mode: "Markdown" });
+    }
   } catch (error: any) {
     console.error("Processing error:", error);
     await ctx.reply(
@@ -138,8 +151,9 @@ export default function getBot() {
       { command: "reset", description: "⚠️ Clear All Data" },
     ]);
 
-    bot.command("start", async (ctx: any) => {
+    bot.command("start", async (ctx: Context) => {
       const userId = ctx.from?.id;
+      if (!userId) return;
       const salary = await getUserSalary(userId);
 
       let welcomeMsg = 
@@ -161,7 +175,7 @@ export default function getBot() {
       await ctx.reply(welcomeMsg, { parse_mode: "Markdown" });
     });
 
-    bot.command("add", async (ctx: any) => {
+    bot.command("add", async (ctx: Context) => {
       const userId = ctx.from?.id;
       if (!userId) return;
 
@@ -199,7 +213,7 @@ export default function getBot() {
       }
     });
 
-    bot.command("salary", async (ctx: any) => {
+    bot.command("salary", async (ctx: Context) => {
       const userId = ctx.from?.id;
       if (!userId) return;
 
@@ -222,7 +236,7 @@ export default function getBot() {
       );
     });
 
-    bot.command("income", async (ctx: any) => {
+    bot.command("income", async (ctx: Context) => {
       const userId = ctx.from?.id;
       if (!userId) return;
 
@@ -247,7 +261,7 @@ export default function getBot() {
       );
     });
 
-    bot.command("reset", (ctx: any) => {
+    bot.command("reset", (ctx: Context) => {
       const keyboard = new InlineKeyboard()
         .text("❌ Cancel", "cancel_clear")
         .text("✅ Confirm Reset", "confirm_clear");
@@ -259,7 +273,7 @@ export default function getBot() {
 
     bot.command("code", handleLoginCode);
 
-    bot.command("categories", async (ctx: any) => {
+    bot.command("categories", async (ctx: Context) => {
       const userId = ctx.from?.id;
       if (!userId) return;
       const cats = await getUserCategories(userId);
@@ -269,7 +283,7 @@ export default function getBot() {
       ctx.reply(`📁 *Your Categories:*\n\n${list}`, { parse_mode: "Markdown" });
     });
 
-    bot.command("history", async (ctx: any) => {
+    bot.command("history", async (ctx: Context) => {
       const userId = ctx.from?.id;
       if (!userId) return;
 
@@ -288,7 +302,7 @@ export default function getBot() {
       await ctx.reply(message, { parse_mode: "Markdown", reply_markup: keyboard });
     });
 
-    bot.command("stats", async (ctx: any) => {
+    bot.command("stats", async (ctx: Context) => {
       const userId = ctx.from?.id;
       if (!userId) return;
 
@@ -319,7 +333,7 @@ export default function getBot() {
     });
 
 
-    bot.command("help", (ctx: any) => {
+    bot.command("help", (ctx: Context) => {
       ctx.reply(
         `📖 *Kharch Command Guide*\n\n` +
         `• *Expenses:* \`/add <amount> <category> [note]\`\n` +
@@ -332,8 +346,9 @@ export default function getBot() {
       );
     });
 
-    bot.on("callback_query:data", async (ctx: any) => {
-      const data = ctx.callbackQuery.data;
+    bot.on("callback_query:data", async (ctx: Context) => {
+      const data = ctx.callbackQuery?.data;
+      if (!data) return;
       const userId = ctx.from?.id;
       if (!userId) return;
 
@@ -351,9 +366,9 @@ export default function getBot() {
       }
     });
 
-    bot.on("message:text", (ctx: any) => {
-      const text = ctx.message.text;
-      if (text.startsWith("/")) return; 
+    bot.on("message:text", (ctx: Context) => {
+      const text = ctx.message?.text;
+      if (!text || text.startsWith("/")) return; 
       handleIncomingMessage(ctx, text);
     });
 

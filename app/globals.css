@@ -14,6 +14,7 @@
   /* Typography */
   --font-sans: var(--font-bricolage);
   --font-instrument: var(--font-instrument);
+  --font-serif: "Instrument Serif", "Georgia", serif;
 
   /* Radii */
   --radius-xl:  0.75rem;
@@ -71,4 +72,9 @@
            border border-zinc-200 dark:border-zinc-800
            rounded-xl p-6 transition-colors;
   }
+}
+
+@layer utilities {
+  .scrollbar-hide::-webkit-scrollbar { display: none; }
+  .scrollbar-hide { -ms-overflow-style: none; scrollbar-width: none; }
 }

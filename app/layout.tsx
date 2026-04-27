@@ -1,7 +1,6 @@
 import type { Metadata } from "next";
 import "./globals.css";
-import { Bricolage_Grotesque } from "next/font/google";
-import { Instrument_Sans } from "next/font/google";
+import { Bricolage_Grotesque, Instrument_Sans, Instrument_Serif } from "next/font/google";
 import { ToastContainer } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
 
@@ -13,6 +12,12 @@ const bricolage = Bricolage_Grotesque({
 const instrument = Instrument_Sans({
   subsets: ["latin"],
   variable: "--font-instrument",
+});
+
+const instrumentSerif = Instrument_Serif({
+  weight: "400",
+  subsets: ["latin"],
+  variable: "--font-serif",
 });
 
 export const metadata: Metadata = {
@@ -27,7 +32,7 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en" suppressHydrationWarning>
-      <body className={`${bricolage.variable} ${instrument.variable} min-h-full flex flex-col bg-black antialiased`}>
+      <body className={`${bricolage.variable} ${instrument.variable} ${instrumentSerif.variable} min-h-full flex flex-col bg-black antialiased`}>
         {children}
         <ToastContainer
           theme="dark"
